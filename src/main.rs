@@ -51,7 +51,7 @@ mod api {
     }
 
     #[derive(Debug)]
-    pub enum Method {
+    enum Method {
         POST,
         PUT,
         DELETE,
@@ -86,7 +86,7 @@ mod api {
         }
     }
     #[derive(Debug)]
-    pub enum Record {
+    enum Record {
         A,
         AAAA,
     }
