@@ -39,13 +39,13 @@ mod api {
     use yaml_rust::{Yaml, YamlLoader};
 
     #[derive(Debug)]
-    pub struct Credentials {
-        pub username: String,
-        pub password: String,
+    struct Credentials {
+        username: String,
+        password: String,
     }
 
     impl Credentials {
-        pub fn new(username: String, password: String) -> Credentials {
+        fn new(username: String, password: String) -> Credentials {
             return Self { username, password };
         }
     }
@@ -118,15 +118,15 @@ mod api {
 
     #[derive(Debug)]
     pub struct API {
-        pub url: String,
-        pub domain: String,
-        pub methods: Vec<Method>,
-        pub records: Vec<Record>,
-        pub credentials: Credentials,
+        url: String,
+        domain: String,
+        methods: Vec<Method>,
+        records: Vec<Record>,
+        credentials: Credentials,
     }
 
     impl API {
-        pub fn new(
+        fn new(
             url: &str,
             domain: &str,
             methods: Vec<&str>,
