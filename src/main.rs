@@ -1,7 +1,5 @@
 use clap::Parser;
-use std::{fs::File, io::Read, net::IpAddr, str::FromStr};
 use tokio;
-use yaml_rust::{Yaml, YamlLoader};
 
 #[derive(Debug, Parser)]
 #[command(author, version, long_about = None)]
@@ -10,11 +8,27 @@ struct Args {
     config_file: Option<String>,
 }
 
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
+    let file = args.config_file.unwrap_or(String::from("config.yaml"));
+    let config = api::API::from_config_file(&file);
+    for c in config.iter() {
+        c.make_request().await?;
+    }
+    Ok(())
+}
+
 mod api {
     use std::{
         fmt::{Display, Formatter},
+        fs::File,
+        io::Read,
+        net::IpAddr,
         str::FromStr,
     };
+
+    use yaml_rust::{Yaml, YamlLoader};
 
     #[derive(Debug)]
     pub struct Credentials {
@@ -88,102 +102,105 @@ mod api {
                 credentials,
             };
         }
-    }
-}
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
-    let file = args.config_file.unwrap_or(String::from("config.yaml"));
-    let config = parse_yaml(load_file(&file), &file);
-    for c in config.iter() {
-        make_request(&c).await?;
-    }
-    Ok(())
-}
-
-fn load_file(file: &str) -> Vec<Yaml> {
-    let mut handle = File::open(file).expect("Unable to open file");
-    let mut contents = String::new();
-
-    handle
-        .read_to_string(&mut contents)
-        .expect("Unable to read file");
-
-    YamlLoader::load_from_str(&contents).expect("Unable to parse YAML")
-}
-
-fn parse_yaml(docs: Vec<Yaml>, file: &str) -> Vec<api::API> {
-    let mut config = Vec::new();
-    for doc in docs.iter() {
-        let credentials = api::Credentials::new(
-            doc["username"]
-                .as_str()
-                .expect(&format!("username should be in {file}"))
-                .to_string(),
-            doc["password"]
-                .as_str()
-                .expect(&format!("password should be in {file}"))
-                .to_string(),
-        );
-        let methods: Vec<&str> = doc["methods"]
-            .as_vec()
-            .expect(&format!(
-                "method list (PUT/POST/DELETE) should be in {file}"
-            ))
-            .iter()
-            .map(|m| m.as_str().unwrap())
-            .collect();
-        let api = api::API::new(
-            doc["url"]
-                .as_str()
-                .expect(&format!("url should be in {file}")),
-            doc["domain"]
-                .as_str()
-                .expect(&format!("domain should be in {file}")),
-            methods,
-            credentials,
-        );
-        config.push(api)
-    }
-    config
-}
-
-async fn make_request(api: &api::API) -> Result<(), Box<dyn std::error::Error>> {
-    let mut request_url = String::new();
-    request_url.push_str(&api.url);
-    request_url.push_str(&api.domain);
-    request_url.push_str("/A");
-    let client = reqwest::Client::builder()
-        .local_address(IpAddr::from_str("0.0.0.0")?)
-        .build()?;
-    for m in &api.method {
-        match m {
-            api::Method::POST => {
-                let resp = client
-                    .post(&request_url)
-                    .basic_auth(&api.credentials.username, Some(&api.credentials.password))
-                    .send()
-                    .await?;
-                print!("{} {} {}", &api.domain, m, resp.text().await?)
+        pub async fn make_request(&self) -> Result<(), Box<dyn std::error::Error>> {
+            let mut request_url = String::new();
+            request_url.push_str(&self.url);
+            request_url.push_str(&self.domain);
+            request_url.push_str("/A");
+            let client = reqwest::Client::builder()
+                .local_address(IpAddr::from_str("0.0.0.0")?)
+                .build()?;
+            for m in &self.method {
+                match m {
+                    Method::POST => {
+                        let resp = client
+                            .post(&request_url)
+                            .basic_auth(
+                                &self.credentials.username,
+                                Some(&self.credentials.password),
+                            )
+                            .send()
+                            .await?;
+                        print!("{} {} {}", &self.domain, m, resp.text().await?)
+                    }
+                    Method::DELETE => {
+                        let resp = client
+                            .delete(&request_url)
+                            .basic_auth(
+                                &self.credentials.username,
+                                Some(&self.credentials.password),
+                            )
+                            .send()
+                            .await?;
+                        print!("{} {} {}", &self.domain, m, resp.text().await?)
+                    }
+                    Method::PUT => {
+                        let resp = client
+                            .put(&request_url)
+                            .basic_auth(
+                                &self.credentials.username,
+                                Some(&self.credentials.password),
+                            )
+                            .send()
+                            .await?;
+                        print!("{} {} {}", &self.domain, m, resp.text().await?)
+                    }
+                };
             }
-            api::Method::DELETE => {
-                let resp = client
-                    .delete(&request_url)
-                    .basic_auth(&api.credentials.username, Some(&api.credentials.password))
-                    .send()
-                    .await?;
-                print!("{} {} {}", &api.domain, m, resp.text().await?)
+            Ok(())
+        }
+
+        fn load_file(file: &str) -> Vec<Yaml> {
+            let mut handle = File::open(file).expect("Unable to open file");
+            let mut contents = String::new();
+
+            handle
+                .read_to_string(&mut contents)
+                .expect("Unable to read file");
+
+            YamlLoader::load_from_str(&contents).expect("Unable to parse YAML")
+        }
+
+        fn parse_yaml(docs: Vec<Yaml>, file: &str) -> Vec<API> {
+            let mut config = Vec::new();
+            for doc in docs.iter() {
+                let credentials = Credentials::new(
+                    doc["username"]
+                        .as_str()
+                        .expect(&format!("username should be in {file}"))
+                        .to_string(),
+                    doc["password"]
+                        .as_str()
+                        .expect(&format!("password should be in {file}"))
+                        .to_string(),
+                );
+                let methods: Vec<&str> = doc["methods"]
+                    .as_vec()
+                    .expect(&format!(
+                        "method list (PUT/POST/DELETE) should be in {file}"
+                    ))
+                    .iter()
+                    .map(|m| m.as_str().unwrap())
+                    .collect();
+                let api = API::new(
+                    doc["url"]
+                        .as_str()
+                        .expect(&format!("url should be in {file}")),
+                    doc["domain"]
+                        .as_str()
+                        .expect(&format!("domain should be in {file}")),
+                    methods,
+                    credentials,
+                );
+                config.push(api)
             }
-            api::Method::PUT => {
-                let resp = client
-                    .put(&request_url)
-                    .basic_auth(&api.credentials.username, Some(&api.credentials.password))
-                    .send()
-                    .await?;
-                print!("{} {} {}", &api.domain, m, resp.text().await?)
-            }
-        };
+            config
+        }
+
+        pub fn from_config_file(filename: &str) -> Vec<API> {
+            let yaml = API::load_file(filename);
+            API::parse_yaml(yaml, filename)
+        }
     }
-    Ok(())
 }
