@@ -24,7 +24,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for c in config.iter() {
         c.make_request().await?;
     }
-    ip.changed = false;
     Ok(())
 }
 
