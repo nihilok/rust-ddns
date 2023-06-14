@@ -36,6 +36,7 @@ mod api {
         str::FromStr,
     };
 
+    use reqwest::RequestBuilder;
     use yaml_rust::{Yaml, YamlLoader};
 
     #[derive(Debug)]
@@ -47,6 +48,10 @@ mod api {
     impl Credentials {
         fn new(username: String, password: String) -> Credentials {
             return Self { username, password };
+        }
+
+        fn authenticate(&self, client: RequestBuilder) -> RequestBuilder {
+            client.basic_auth(&self.username, Some(&self.password))
         }
     }
 
@@ -192,38 +197,25 @@ mod api {
                 for m in &self.methods {
                     match m {
                         Method::POST => {
-                            let resp = client
-                                .post(&request_url)
-                                .basic_auth(
-                                    &self.credentials.username,
-                                    Some(&self.credentials.password),
-                                )
-                                .send()
-                                .await?;
+                            let client = client
+                                .post(&request_url);
+                            let client = self.credentials.authenticate(client);
+                            let resp = client.send().await?;
                             let text = resp.text().await?;
                             API::print_response(&request_url, m, &text);
                         }
                         Method::DELETE => {
-                            let resp = client
-                                .delete(&request_url)
-                                .basic_auth(
-                                    &self.credentials.username,
-                                    Some(&self.credentials.password),
-                                )
-                                .send()
-                                .await?;
+                            let client = client
+                                .delete(&request_url);
+                            let client = self.credentials.authenticate(client);
+                            let resp = client.send().await?;
                             let text = resp.text().await?;
                             API::print_response(&request_url, m, &text);
                         }
                         Method::PUT => {
-                            let resp = client
-                                .put(&request_url)
-                                .basic_auth(
-                                    &self.credentials.username,
-                                    Some(&self.credentials.password),
-                                )
-                                .send()
-                                .await?;
+                            let client = client.put(&request_url);
+                            let client = self.credentials.authenticate(client);
+                            let resp = client.send().await?;
                             let text = resp.text().await?;
                             API::print_response(&request_url, m, &text);
                         }
