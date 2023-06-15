@@ -31,7 +31,6 @@ impl IP {
             logger.info(&format!("IP address changed: New IP: {}", actual_ip));
             self.current = actual_ip;
             self.changed = true;
-            self.write_current_ip_to_file()?;
         } else {
             logger.debug("IP address did not change");
         }
@@ -78,5 +77,15 @@ impl IP {
             changed: false,
             filename: file.to_string(),
         })
+    }
+}
+
+impl Drop for IP {
+    fn drop(&mut self) {
+        let logger = logging::Logger::new();
+        match self.write_current_ip_to_file() {
+            Ok(_) => (),
+            Err(err) => logger.error(&format!("Error writing IP to file\n{:#?}", err))
+        };
     }
 }

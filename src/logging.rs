@@ -1,13 +1,14 @@
 use crate::{time_tools, LOG_LEVEL};
 
-#[derive(PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub enum LogLevel {
     DEBUG,
     INFO,
 //    WARNING,
-//    ERROR,
+    ERROR,
 }
 
+#[derive(Debug)]
 pub struct Logger {
     level: LogLevel,
 }
@@ -35,9 +36,10 @@ impl Logger {
 //            self.print_log("WARNING", message)
 //        }
 //    }
-//    pub fn error(&self, message: &str) {
-//        if self.level <= LogLevel::ERROR {
-//            self.print_log("ERROR", message)
-//        }
-//    }
+    pub fn error(&self, message: &str) {
+        if self.level <= LogLevel::ERROR {
+            let newline = if message.ends_with("\n") { "" } else { "\n" };
+            eprint!("{} |{}| {}{}", time_tools::now_as_string(), "ERROR", message, newline);
+        }
+    }
 }

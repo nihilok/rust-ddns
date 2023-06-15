@@ -1,9 +1,10 @@
-use crate::logging;
+use crate::logging::Logger;
 use std::{
     fmt::{Display, Formatter},
     fs::File,
     io::Read,
     net::{IpAddr, Ipv6Addr},
+    process,
     str::FromStr,
 };
 
@@ -124,6 +125,7 @@ pub struct APIClient {
     credentials: Credentials,
     server: String,
     protocol: Protocol,
+    logger: Logger,
 }
 
 impl APIClient {
@@ -155,6 +157,7 @@ impl APIClient {
             records,
             credentials,
             protocol,
+            logger: Logger::new(),
         };
     }
 
@@ -208,11 +211,11 @@ impl APIClient {
         method: &Method,
         record: &Record,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let logger = logging::Logger::new();
         let client = self.credentials.authenticate(client);
         let resp = client.send().await?;
         let text = resp.text().await?;
-        logger.info(&format!("{} {} {} {}", &self.domain, record, method, text));
+        self.logger
+            .info(&format!("{} {} {} {}", &self.domain, record, method, text));
         Ok(())
     }
 
@@ -228,45 +231,84 @@ impl APIClient {
     }
 
     fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
+        let logger = Logger::new();
         let mut config = Vec::new();
         for doc in docs.iter() {
-            let credentials = Credentials::new(
-                doc["username"]
-                    .as_str()
-                    .expect(&format!("username should be in {file}"))
-                    .to_string(),
-                doc["password"]
-                    .as_str()
-                    .expect(&format!("password should be in {file}"))
-                    .to_string(),
-            );
-            let methods: Vec<&str> = doc["methods"]
-                .as_vec()
-                .expect(&format!(
-                    "method list (PUT/POST/DELETE) should be in {file}"
-                ))
-                .iter()
-                .map(|m| m.as_str().expect("should be able to parse methods list"))
-                .collect();
+            let username;
+            let password;
+            let server;
+            let domain;
+            match doc["username"].as_str() {
+                Some(result) => username = result,
+                None => {
+                    logger.error(&format!("'username' should be in {}", file));
+                    process::exit(1);
+                }
+            };
+            match doc["password"].as_str() {
+                Some(result) => password = result,
+                None => {
+                    logger.error(&format!("'password' should be in {}", file));
+                    process::exit(1);
+                }
+            };
+            match doc["server"].as_str() {
+                Some(result) => server = result,
+    None => {
+                    logger.error(&format!("'server' should be in {}", file));
+                    process::exit(1);
+                }
+            };
+            match doc["domain"].as_str() {
+                Some(result) => domain = result,
+    None => {
+                    logger.error(&format!("'domain' should be in {}", file));
+                    process::exit(1);
+                }
+            };
+
+            let credentials = Credentials::new(username.to_string(), password.to_string());
+
+            let methods: Vec<&str>;
+
+            match doc["methods"].as_vec() {
+                Some(methods_vec) => {
+                    methods = methods_vec
+                        .iter()
+                        .map(|m| match m.as_str() {
+                            Some(method) => method,
+                            None => {
+                                logger
+                                    .error(&format!("could not parse 'methods' list in {}", file));
+                                process::exit(1);
+                            }
+                        })
+                        .collect()
+                }
+                None => {
+                    logger.error(&format!("'methods' (list) should be in {}", file));
+                    process::exit(1);
+                }
+            }
+
             let records = doc["records"].as_vec();
             let records = match records {
                 Some(v) => v
                     .iter()
-                    .map(|m| {
-                        m.as_str()
-                            .expect(&format!("should be able to parse records list in {file}"))
+                    .map(|r| match r.as_str() {
+                        Some(record) => record,
+                        None => {
+                            logger.error(&format!("could not parse 'records' list in {}", file));
+                            process::exit(1);
+                        }
                     })
                     .collect(),
                 None => vec!["a"],
             };
 
             let api = APIClient::new(
-                doc["server"]
-                    .as_str()
-                    .expect(&format!("server should be in {file}")),
-                doc["domain"]
-                    .as_str()
-                    .expect(&format!("domain should be in {file}")),
+                server,
+                domain,
                 methods,
                 records,
                 credentials,
