@@ -2,7 +2,7 @@
 
 set -e
 
-RUN_SCRIPT='run_with_file_logging.sh'
+RUN_SCRIPT='ddnsd'
 CURRENT_DIR=$(pwd)
 
 if [[ -f 'install.sh' ]] && [[ -f $RUN_SCRIPT ]]; then
@@ -36,5 +36,5 @@ ln -s $CURRENT_DIR/target/release/rust-ddns $HOME/.local/bin/rust-ddns
 sudo systemctl daemon-reload
 
 else
-echo "required files not found" || exit 1
+echo "Required files not found. Make sure you are running the script from within the source directory" && exit 1
 fi

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if [[ -z $RUST_DDNS_LOG_FILE ]]; then
+RUST_DDNS_LOG_FILE=$HOME/.rust-ddns.log
+fi
+
+cd $HOME || exit 1
+
+rust-ddns &>> $LOG_FILE
+
+echo "$(tail -n 200 $RUST_DDNS_LOG_FILE)" > $RUST_DDNS_LOG_FILE
