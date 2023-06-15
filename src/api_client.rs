@@ -179,7 +179,7 @@ impl APIClient {
         };
     }
 
-    pub async fn make_request(&self) -> Result<(), crate::DynamicError> {
+    pub async fn make_request(&self) -> Result<(), crate::error::DynamicError> {
         for record in &mut self.records.iter() {
             let request_url =
                 self.protocol

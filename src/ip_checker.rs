@@ -20,7 +20,7 @@ impl IP {
         Ok(reqwest::get(V4_URL).await?.text().await?)
     }
 
-    pub async fn compare(&mut self) -> Result<(), crate::DynamicError> {
+    pub async fn compare(&mut self) -> Result<(), crate::error::DynamicError> {
         let logger = logging::Logger::new();
         logger.debug(&format!("Saved IP address '{}'", &self.current));
         logger.debug(&format!("Making request to {}", V4_URL));
@@ -60,7 +60,7 @@ impl IP {
         IP::new(f)
     }
 
-    fn from_file(file: &str) -> Result<IP, crate::DynamicError> {
+    fn from_file(file: &str) -> Result<IP, crate::error::DynamicError> {
         let handle_result = File::open(file);
         let mut handle = match handle_result {
             Ok(f) => f,
