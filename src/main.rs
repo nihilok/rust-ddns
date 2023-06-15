@@ -20,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
     let file = args.config_file.unwrap_or(String::from("config.yaml"));
-    let config = api::API::from_config_file(&file);
+    let config = api::APIClient::from_config_file(file);
     for c in config.iter() {
         c.make_request().await?;
     }
@@ -36,7 +36,8 @@ mod api {
         str::FromStr,
     };
 
-    use reqwest::RequestBuilder;
+    use crate::time_tools;
+    use reqwest::{header, RequestBuilder};
     use yaml_rust::{Yaml, YamlLoader};
 
     #[derive(Debug)]
@@ -121,23 +122,48 @@ mod api {
         }
     }
 
+    #[derive(Debug, PartialEq)]
+    enum Protocol {
+        GoogleDomains,
+        MailInABox,
+    }
+
+    impl Protocol {
+        fn build_url(&self, server: &str, domain: &str, record: &str) -> String {
+            match self {
+                Protocol::GoogleDomains => format!("https://{server}/nic/update?hostname={domain}"),
+                Protocol::MailInABox => {
+                    format!("https://{server}/admin/dns/custom/{domain}/{record}")
+                }
+            }
+        }
+
+        fn from_server(server: &str) -> Self {
+            match server {
+                "domains.google.com" => Self::GoogleDomains,
+                _ => Self::MailInABox,
+            }
+        }
+    }
+
     #[derive(Debug)]
-    pub struct API {
-        url: String,
+    pub struct APIClient {
         domain: String,
         methods: Vec<Method>,
         records: Vec<Record>,
         credentials: Credentials,
+        server: String,
+        protocol: Protocol,
     }
 
-    impl API {
+    impl APIClient {
         fn new(
-            url: &str,
+            server: &str,
             domain: &str,
             methods: Vec<&str>,
             records: Vec<&str>,
             credentials: Credentials,
-        ) -> API {
+        ) -> Self {
             let methods: Vec<Method> = methods
                 .iter()
                 .map(|x| {
@@ -153,75 +179,80 @@ mod api {
                 })
                 .collect();
 
+            let protocol = Protocol::from_server(server);
+
             return Self {
-                url: url.to_string(),
                 domain: domain.to_string(),
+                server: server.to_string(),
                 methods,
                 records,
                 credentials,
+                protocol,
             };
         }
 
-        fn print_response(request_url: &str, method: &Method, response_text: &str) {
-            let newline = if response_text.ends_with("\n") {
-                ""
-            } else {
-                "\n"
-            };
-            print!("{} {} {}{}", request_url, method, response_text, newline);
-        }
-
-        pub async fn make_request(&self) -> Result<(), Box<dyn std::error::Error>> {
-            let mut request_url_base = String::new();
-            request_url_base.push_str(&self.url);
-            request_url_base.push_str(&self.domain);
-
+        pub async fn make_request(
+            &self,
+        ) -> Result<(), Box<dyn std::error::Error>> {
             for record in &mut self.records.iter() {
-                let mut request_url = request_url_base.clone();
-                let client_builder = reqwest::Client::builder();
+                let request_url =
+                    self.protocol
+                        .build_url(&self.server, &self.domain, &record.to_string());
+                let mut headers = header::HeaderMap::new();
+                headers.insert(
+                    header::USER_AGENT,
+                    header::HeaderValue::from_static("Rust Reqwest"),
+                );
+                headers.insert(
+                    header::CONTENT_LENGTH,
+                    header::HeaderValue::from_static("0"),
+                );
+                let client_builder = reqwest::Client::builder().default_headers(headers);
                 let client = match record {
-                    Record::A => {
-                        request_url.push_str(&format!("/{}", record));
-                        client_builder
-                            .local_address(IpAddr::from_str("0.0.0.0")?)
-                            .build()?
-                    }
-                    Record::AAAA => {
-                        request_url.push_str(&format!("/{}", record));
-                        client_builder
-                            .local_address(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)))
-                            .build()?
-                    }
+                    Record::A => client_builder
+                        .local_address(IpAddr::from_str("0.0.0.0")?)
+                        .build()?,
+                    Record::AAAA => client_builder
+                        .local_address(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)))
+                        .build()?,
                 };
 
-                for m in &self.methods {
-                    match m {
+                for method in &self.methods {
+                    match method {
                         Method::POST => {
-                            let client = client
-                                .post(&request_url);
-                            let client = self.credentials.authenticate(client);
-                            let resp = client.send().await?;
-                            let text = resp.text().await?;
-                            API::print_response(&request_url, m, &text);
+                            let client = client.post(&request_url);
+                            APIClient::manage_request(client, &self.credentials, &self.domain, method, record).await?;
                         }
                         Method::DELETE => {
-                            let client = client
-                                .delete(&request_url);
-                            let client = self.credentials.authenticate(client);
-                            let resp = client.send().await?;
-                            let text = resp.text().await?;
-                            API::print_response(&request_url, m, &text);
+                            let client = client.delete(&request_url);
+                            APIClient::manage_request(client, &self.credentials, &self.domain, method, record).await?;
                         }
                         Method::PUT => {
                             let client = client.put(&request_url);
-                            let client = self.credentials.authenticate(client);
-                            let resp = client.send().await?;
-                            let text = resp.text().await?;
-                            API::print_response(&request_url, m, &text);
+                            APIClient::manage_request(client, &self.credentials, &self.domain, method, record).await?;
                         }
                     };
                 }
             }
+            Ok(())
+        }
+
+        async fn manage_request(
+            client: RequestBuilder,
+            credentials: &Credentials,
+            domain: &str,
+            method: &Method,
+            record: &Record,
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            let client = credentials.authenticate(client);
+            let resp = client.send().await?;
+            let text = resp.text().await?;
+            let newline = if text.ends_with("\n") { "" } else { "\n" };
+            let now = time_tools::now_as_string();
+            print!(
+                "{} {} {} {} {}{}",
+                now, domain, record, method, text, newline
+            );
             Ok(())
         }
 
@@ -236,7 +267,7 @@ mod api {
             YamlLoader::load_from_str(&contents).expect("Unable to parse YAML")
         }
 
-        fn parse_yaml(docs: Vec<Yaml>, file: &str) -> Vec<API> {
+        fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
             let mut config = Vec::new();
             for doc in docs.iter() {
                 let credentials = Credentials::new(
@@ -257,19 +288,22 @@ mod api {
                     .iter()
                     .map(|m| m.as_str().expect("should be able to parse methods list"))
                     .collect();
-                let records: Vec<&str> = doc["records"]
-                    .as_vec()
-                    .expect(&format!("records list (A/AAAA) should be in {file}"))
-                    .iter()
-                    .map(|m| {
-                        m.as_str()
-                            .expect(&format!("should be able to parse methods list in {file}"))
-                    })
-                    .collect();
-                let api = API::new(
-                    doc["url"]
+                let records = doc["records"].as_vec();
+                let records = match records {
+                    Some(v) => v
+                        .iter()
+                        .map(|m| {
+                            m.as_str()
+                                .expect(&format!("should be able to parse records list in {file}"))
+                        })
+                        .collect(),
+                    None => vec!["a"],
+                };
+
+                let api = APIClient::new(
+                    doc["server"]
                         .as_str()
-                        .expect(&format!("url should be in {file}")),
+                        .expect(&format!("server should be in {file}")),
                     doc["domain"]
                         .as_str()
                         .expect(&format!("domain should be in {file}")),
@@ -282,9 +316,9 @@ mod api {
             config
         }
 
-        pub fn from_config_file(filename: &str) -> Vec<API> {
-            let yaml = API::load_file(filename);
-            API::parse_yaml(yaml, filename)
+        pub fn from_config_file(filename: String) -> Vec<APIClient> {
+            let yaml = APIClient::load_file(&filename);
+            APIClient::parse_yaml(yaml, filename)
         }
     }
 }
@@ -363,5 +397,21 @@ mod ip_checker {
                 filename: file.to_string(),
             })
         }
+    }
+}
+
+mod time_tools {
+    use chrono::prelude::{DateTime, Utc};
+    use std::time;
+
+    pub fn now_as_string() -> String {
+        let t = time::SystemTime::now();
+        iso8601(&t)
+    }
+
+    fn iso8601(st: &time::SystemTime) -> String {
+        let dt: DateTime<Utc> = st.clone().into();
+        format!("{}", dt.format("%+"))
+        // formats like "2001-07-08T00:34:60.026490+09:30"
     }
 }
