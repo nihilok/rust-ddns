@@ -136,16 +136,34 @@ impl APIClient {
         records: Vec<&str>,
         credentials: Credentials,
     ) -> Self {
+        let logger = Logger::new();
+
         let methods: Vec<Method> = methods
             .iter()
-            .map(|x| {
-                Method::from_str(x).expect("Could not parse method, must be PUT, POST or DELETE")
+            .map(|x| match Method::from_str(x) {
+                Ok(m) => m,
+                Err(_) => {
+                    logger.error(&format!(
+                        "Could not parse methods in config file; must be PUT, POST or DELETE (got '{}')",
+                        x
+                    ));
+                    process::exit(1);
+                }
             })
             .collect();
 
         let records: Vec<Record> = records
             .iter()
-            .map(|x| Record::from_str(x).expect("Could not parse record, must be either A or AAAA"))
+            .map(|x| match Record::from_str(x) {
+                Ok(r) => r,
+                Err(_) => {
+                    logger.error(&format!(
+                        "Could not parse records in config file; must be A or AAAA (got '{}')",
+                        x
+                    ));
+                    process::exit(1);
+                }
+            })
             .collect();
 
         let protocol = Protocol::from_server(server);
@@ -157,7 +175,7 @@ impl APIClient {
             records,
             credentials,
             protocol,
-            logger: Logger::new(),
+            logger,
         };
     }
 
@@ -254,14 +272,14 @@ impl APIClient {
             };
             match doc["server"].as_str() {
                 Some(result) => server = result,
-    None => {
+                None => {
                     logger.error(&format!("'server' should be in {}", file));
                     process::exit(1);
                 }
             };
             match doc["domain"].as_str() {
                 Some(result) => domain = result,
-    None => {
+                None => {
                     logger.error(&format!("'domain' should be in {}", file));
                     process::exit(1);
                 }
@@ -306,13 +324,7 @@ impl APIClient {
                 None => vec!["a"],
             };
 
-            let api = APIClient::new(
-                server,
-                domain,
-                methods,
-                records,
-                credentials,
-            );
+            let api = APIClient::new(server, domain, methods, records, credentials);
             config.push(api)
         }
         config

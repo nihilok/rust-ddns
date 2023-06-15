@@ -7,7 +7,7 @@ use std::{
 
 use crate::logging;
 
-const V4_URL: &'static str = "https://api.ipify.org";
+const V4_URL: &'static str = "https://api4.ipify.org";
 
 pub struct IP {
     current: Ipv4Addr,
