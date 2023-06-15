@@ -29,7 +29,7 @@ Description=Run rust-ddns once
 
 [Service]
 ExecStart=$CURRENT_DIR/$RUN_SCRIPT
-Environment=HOME=$HOME
+Environment=HOME=%h
 " | sudo tee /etc/systemd/system/rust-ddns.service
 
 cargo build --release
