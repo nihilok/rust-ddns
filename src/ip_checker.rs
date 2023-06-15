@@ -16,11 +16,11 @@ pub struct IP {
 }
 
 impl IP {
-    async fn get_actual_ip() -> Result<String, Box<dyn std::error::Error>> {
+    async fn get_actual_ip() -> Result<String, reqwest::Error> {
         Ok(reqwest::get(V4_URL).await?.text().await?)
     }
 
-    pub async fn compare(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn compare(&mut self) -> Result<(), crate::DynamicError> {
         let logger = logging::Logger::new();
         logger.debug(&format!("Saved IP address '{}'", &self.current));
         logger.debug(&format!("Making request to {}", V4_URL));
@@ -37,7 +37,7 @@ impl IP {
         Ok(())
     }
 
-    fn write_current_ip_to_file(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn write_current_ip_to_file(&self) -> Result<(), std::io::Error> {
         let mut file = File::create(&self.filename)?;
         file.write_all(format!("{}", self.current).as_bytes())?;
         Ok(())
@@ -60,7 +60,7 @@ impl IP {
         IP::new(f)
     }
 
-    fn from_file(file: &str) -> Result<IP, Box<dyn std::error::Error>> {
+    fn from_file(file: &str) -> Result<IP, crate::DynamicError> {
         let handle_result = File::open(file);
         let mut handle = match handle_result {
             Ok(f) => f,
@@ -85,7 +85,7 @@ impl Drop for IP {
         let logger = logging::Logger::new();
         match self.write_current_ip_to_file() {
             Ok(_) => (),
-            Err(err) => logger.error(&format!("Error writing IP to file\n{:#?}", err))
+            Err(err) => logger.error(&format!("Error writing IP to file\n{:#?}", err)),
         };
     }
 }
