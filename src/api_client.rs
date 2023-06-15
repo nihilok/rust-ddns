@@ -179,7 +179,7 @@ impl APIClient {
         };
     }
 
-    pub async fn make_request(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn make_request(&self) -> Result<(), crate::DynamicError> {
         for record in &mut self.records.iter() {
             let request_url =
                 self.protocol
@@ -228,7 +228,7 @@ impl APIClient {
         client: RequestBuilder,
         method: &Method,
         record: &Record,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), reqwest::Error> {
         let client = self.credentials.authenticate(client);
         let resp = client.send().await?;
         let text = resp.text().await?;

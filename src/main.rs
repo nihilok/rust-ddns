@@ -9,6 +9,8 @@ mod logging;
 
 const LOG_LEVEL: logging::LogLevel = logging::LogLevel::INFO;
 
+type DynamicError = Box<dyn std::error::Error>;
+
 #[derive(Debug, Parser)]
 #[command(author, version, long_about = None)]
 struct Args {
@@ -19,7 +21,7 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), DynamicError> {
     let args = Args::parse();
     let ip_file = args.ip_file.unwrap_or(String::from(".ip"));
     let mut ip = ip_checker::IP::load(ip_file);
