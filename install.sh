@@ -5,14 +5,18 @@ set -e
 RUN_SCRIPT='ddnsd'
 CURRENT_DIR=$(pwd)
 
+if [[ -z $RUST_DDNS_INTERVAL ]]; then
+RUST_DDNS_INTERVAL=5min
+fi
+
 if [[ -f 'install.sh' ]] && [[ -f $RUN_SCRIPT ]]; then
 echo "\
 [Unit]
 Description=Runs rust-ddns every 5 minutes
 
 [Timer]
-OnBootSec=5min
-OnUnitActiveSec=5min
+OnBootSec=$RUST_DDNS_INTERVAL
+OnUnitActiveSec=$RUST_DDNS_INTERVAL
 Unit=rust-ddns.service
 
 [Install]
