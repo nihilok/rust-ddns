@@ -1,5 +1,6 @@
 use clap::Parser;
 use tokio;
+use futures::future::join_all;
 
 #[derive(Debug, Parser)]
 #[command(author, version, long_about = None)]
@@ -21,9 +22,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let file = args.config_file.unwrap_or(String::from("config.yaml"));
     let config = api::APIClient::from_config_file(file);
+    let mut futures = Vec::new();
     for c in config.iter() {
-        c.make_request().await?;
+        futures.push(c.make_request());
     }
+    join_all(futures).await;
     Ok(())
 }
 
