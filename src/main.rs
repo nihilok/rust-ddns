@@ -9,8 +9,6 @@ mod logging;
 mod time_tools;
 mod ip_checker;
 
-const LOG_LEVEL: logging::LogLevel = logging::LogLevel::INFO;
-
 #[tokio::main]
 async fn main() -> Result<(), error::DynamicError> {
     let args = arg_parser::Args::parse();
