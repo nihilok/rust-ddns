@@ -5,7 +5,7 @@ use std::{
     io::Read,
     net::{IpAddr, Ipv6Addr},
     process,
-    str::FromStr, sync::{Mutex, Arc},
+    str::FromStr, sync::Arc,
 };
 
 use reqwest::{header, RequestBuilder};
@@ -125,7 +125,7 @@ pub struct APIClient {
     credentials: Credentials,
     server: String,
     protocol: Protocol,
-    checker: Arc<Mutex<crate::ip_checker::IP>>,
+    checker: Arc<crate::ip_checker::IP>,
     logger: Logger,
 }
 
@@ -136,6 +136,7 @@ impl APIClient {
         methods: Vec<&str>,
         records: Vec<&str>,
         credentials: Credentials,
+        checker: Arc<crate::ip_checker::IP>,
     ) -> Self {
         let logger = Logger::new();
 
@@ -169,8 +170,6 @@ impl APIClient {
 
         let protocol = Protocol::from_server(server);
 
-        let checker = Arc::new(Mutex::new(crate::ip_checker::IP::new()));
-
         return Self {
             domain: domain.to_string(),
             server: server.to_string(),
@@ -184,8 +183,7 @@ impl APIClient {
     }
 
     pub async fn make_request(&self) -> Result<(), crate::error::DynamicError> {
-        let checker = Arc::clone(&self.checker);
-        let changed = checker.lock().unwrap().compare(&self.domain).await?;
+        let changed = &self.checker.compare(&self.domain).await?;
         if !changed {
             return Ok(());
         }
@@ -268,7 +266,10 @@ impl APIClient {
         YamlLoader::load_from_str(&contents).expect("Unable to parse YAML")
     }
 
-    fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
+    async fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
+        let mut checker = crate::ip_checker::IP::new();
+        checker.set_actual().await;
+        let checker = Arc::new(checker);
         let logger = Logger::new();
         let mut config = Vec::new();
         for doc in docs.iter() {
@@ -343,16 +344,16 @@ impl APIClient {
                     .collect(),
                 None => vec!["a"],
             };
-
-            let api = APIClient::new(server, domain, methods, records, credentials);
+            let checker_clone = Arc::clone(&checker);
+            let api = APIClient::new(server, domain, methods, records, credentials, checker_clone);
             config.push(api)
         }
         config
     }
 
-    pub fn from_config_file(filename: String) -> Vec<APIClient> {
+    pub async fn from_config_file(filename: String) -> Vec<APIClient> {
         let yaml = APIClient::load_file(&filename);
         let yaml = yaml.clone();
-        APIClient::parse_yaml(yaml, filename)
+        APIClient::parse_yaml(yaml, filename).await
     }
 }

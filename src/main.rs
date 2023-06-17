@@ -14,7 +14,7 @@ const DEFAULT_CONFIG_FILE: &'static str = ".ddns.conf";
 #[tokio::main]
 async fn main() -> Result<(), error::DynamicError> {
     let file = get_config_file_path();
-    let mut config = api_client::APIClient::from_config_file(file);
+    let mut config = api_client::APIClient::from_config_file(file).await;
     let mut futures = Vec::new();
     for c in config.iter_mut() {
         futures.push(c.make_request());

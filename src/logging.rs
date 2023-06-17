@@ -54,11 +54,11 @@ impl Logger {
             self.print_log("DEBUG", message)
         }
     }
-    pub fn warning(&self, message: &str) {
-        if self.level <= LogLevel::WARNING {
-            self.print_log("WARNING", message)
-        }
-    }
+//    pub fn warning(&self, message: &str) {
+//        if self.level <= LogLevel::WARNING {
+//            self.print_log("WARNING", message)
+//        }
+//    }
     pub fn error(&self, message: &str) {
         if self.level <= LogLevel::ERROR {
             let newline = if message.ends_with("\n") { "" } else { "\n" };
