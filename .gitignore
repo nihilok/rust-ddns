@@ -1,3 +1,4 @@
-ddns.conf
+test.conf
 target/
 .ip
+run.json
