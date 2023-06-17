@@ -246,12 +246,23 @@ impl APIClient {
     }
 
     fn load_file(file: &str) -> Vec<Yaml> {
-        let mut handle = File::open(file).expect("Unable to open file");
+        let logger = crate::logging::Logger::new();
+        let mut handle = match File::open(file) {
+            Ok(f) => f,
+            Err(_) => {
+                logger.error(&format!("Could not load config file {}", file));
+                std::process::exit(1)
+            }
+        };
         let mut contents = String::new();
 
-        handle
-            .read_to_string(&mut contents)
-            .expect("Unable to read file");
+        match handle.read_to_string(&mut contents) {
+            Ok(_) => (),
+            Err(err) => {
+                logger.debug(&format!("{:#?}", err));
+                std::process::exit(1)
+            }
+        }
 
         YamlLoader::load_from_str(&contents).expect("Unable to parse YAML")
     }

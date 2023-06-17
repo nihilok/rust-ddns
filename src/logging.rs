@@ -1,4 +1,4 @@
-use crate::{time_tools};
+use crate::time_tools;
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub enum LogLevel {
@@ -28,13 +28,21 @@ impl Logger {
     pub fn new() -> Self {
         let level = match std::env::var("DDNS_LOG_LEVEL") {
             Ok(val) => val,
-            Err(_) => "INFO".to_string()
+            Err(_) => "INFO".to_string(),
         };
-        Self { level: level.into() }
+        Self {
+            level: level.into(),
+        }
     }
     fn print_log(&self, level: &str, message: &str) {
         let newline = if message.ends_with("\n") { "" } else { "\n" };
-        print!("{} |{}| {}{}", time_tools::now_as_string(), level, message, newline);
+        print!(
+            "{} |{}| {}{}",
+            time_tools::now_as_string(),
+            level,
+            message,
+            newline
+        );
     }
     pub fn info(&self, message: &str) {
         if self.level <= LogLevel::INFO {
@@ -54,7 +62,13 @@ impl Logger {
     pub fn error(&self, message: &str) {
         if self.level <= LogLevel::ERROR {
             let newline = if message.ends_with("\n") { "" } else { "\n" };
-            eprint!("{} |{}| {}{}", time_tools::now_as_string(), "ERROR", message, newline);
+            eprint!(
+                "{} |{}| {}{}",
+                time_tools::now_as_string(),
+                "ERROR",
+                message,
+                newline
+            );
         }
     }
 }

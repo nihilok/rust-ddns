@@ -1,4 +1,4 @@
-use clap::{Parser, command};
+use clap::{command, Parser};
 
 #[derive(Debug, Parser)]
 #[command(author, version, long_about = "Dynamic DNS Client")]

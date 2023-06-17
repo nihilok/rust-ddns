@@ -1,8 +1,5 @@
-use std::{
-    net::Ipv4Addr,
-    str::FromStr,
-};
 use command_line;
+use std::{net::Ipv4Addr, str::FromStr};
 
 use crate::logging;
 
