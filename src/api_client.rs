@@ -5,7 +5,7 @@ use std::{
     io::Read,
     net::{IpAddr, Ipv6Addr},
     process,
-    str::FromStr,
+    str::FromStr, sync::{Mutex, Arc},
 };
 
 use reqwest::{header, RequestBuilder};
@@ -125,7 +125,7 @@ pub struct APIClient {
     credentials: Credentials,
     server: String,
     protocol: Protocol,
-    checker: crate::ip_checker::IP,
+    checker: Arc<Mutex<crate::ip_checker::IP>>,
     logger: Logger,
 }
 
@@ -169,7 +169,7 @@ impl APIClient {
 
         let protocol = Protocol::from_server(server);
 
-        let ip_checker = crate::ip_checker::IP::new(domain);
+        let checker = Arc::new(Mutex::new(crate::ip_checker::IP::new(domain)));
 
         return Self {
             domain: domain.to_string(),
@@ -178,13 +178,14 @@ impl APIClient {
             records,
             credentials,
             protocol,
-            checker: ip_checker,
+            checker,
             logger,
         };
     }
 
-    pub async fn make_request(&mut self) -> Result<(), crate::error::DynamicError> {
-        let changed = &self.checker.compare().await?;
+    pub async fn make_request(&self) -> Result<(), crate::error::DynamicError> {
+        let checker = Arc::clone(&self.checker);
+        let changed = checker.lock().unwrap().compare().await?;
         if !changed {
             return Ok(());
         }
