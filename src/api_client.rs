@@ -125,6 +125,7 @@ pub struct APIClient {
     credentials: Credentials,
     server: String,
     protocol: Protocol,
+    checker: crate::ip_checker::IP,
     logger: Logger,
 }
 
@@ -168,6 +169,8 @@ impl APIClient {
 
         let protocol = Protocol::from_server(server);
 
+        let ip_checker = crate::ip_checker::IP::new(domain);
+
         return Self {
             domain: domain.to_string(),
             server: server.to_string(),
@@ -175,11 +178,16 @@ impl APIClient {
             records,
             credentials,
             protocol,
+            checker: ip_checker,
             logger,
         };
     }
 
-    pub async fn make_request(&self) -> Result<(), crate::error::DynamicError> {
+    pub async fn make_request(&mut self) -> Result<(), crate::error::DynamicError> {
+        let changed = &self.checker.compare().await?;
+        if !changed {
+            return Ok(());
+        }
         for record in &mut self.records.iter() {
             let request_url =
                 self.protocol
@@ -332,6 +340,7 @@ impl APIClient {
 
     pub fn from_config_file(filename: String) -> Vec<APIClient> {
         let yaml = APIClient::load_file(&filename);
+        let yaml = yaml.clone();
         APIClient::parse_yaml(yaml, filename)
     }
 }

@@ -172,6 +172,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 
 [[package]]
+name = "command_line"
+version = "0.1.0"
+source = "git+https://github.com/nihilok/rust-command-line.git#90d91293f362dc44d3a7a974d45d376140fb390b"
+
+[[package]]
 name = "core-foundation"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -826,6 +831,7 @@ dependencies = [
  "base64",
  "chrono",
  "clap",
+ "command_line",
  "futures",
  "reqwest",
  "tokio",

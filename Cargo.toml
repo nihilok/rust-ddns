@@ -13,3 +13,4 @@ yaml-rust = "0.4.5"
 clap = { version = "4.2.5", features = ["derive"] }
 chrono = "0.4.26"
 futures = "0.3"
+command_line = { git = "https://github.com/nihilok/rust-command-line.git" }

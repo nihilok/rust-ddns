@@ -1,18 +1,16 @@
 use std::{
-    fs::File,
-    io::{Read, Write},
     net::Ipv4Addr,
     str::FromStr,
 };
+use command_line;
 
 use crate::logging;
 
 const V4_URL: &'static str = "https://api4.ipify.org";
 
+#[derive(Debug)]
 pub struct IP {
-    current: Ipv4Addr,
-    pub changed: bool,
-    filename: String,
+    pub domain: String,
 }
 
 impl IP {
@@ -20,74 +18,50 @@ impl IP {
         Ok(reqwest::get(V4_URL).await?.text().await?)
     }
 
-    pub async fn compare(&mut self) -> Result<(), crate::error::DynamicError> {
+    async fn get_previous_ip(domain: &str) -> Result<String, command_line::Errors> {
+        match command_line::execute_command(&format!("dig +short {}", domain)) {
+            Ok(output) => {
+                let mut result = output.output().to_string();
+                trim_newline(&mut result);
+                Ok(result)
+            }
+            Err(_) => todo!(),
+        }
+    }
+
+    pub async fn compare(&self) -> Result<bool, crate::error::DynamicError> {
         let logger = logging::Logger::new();
-        logger.debug(&format!("IP address saved locally: '{}'", &self.current));
-        logger.debug(&format!("Making request to {}", V4_URL));
         let actual = IP::get_actual_ip().await?;
-        logger.debug(&format!("Request returned IP address: '{}'", actual));
+        let current = match IP::get_previous_ip(&self.domain).await {
+            Ok(output) => output,
+            Err(err) => return Err(Box::new(err)),
+        };
+        logger.debug(&format!("dig returned IP address: '{}'", current));
+        logger.debug(&format!("ipify returned IP address: '{}'", actual));
+
         let actual_ip = Ipv4Addr::from_str(&actual)?;
-        if actual_ip != self.current {
+        let current_ip = Ipv4Addr::from_str(&current)?;
+        if actual_ip != current_ip {
             logger.info(&format!("IP address changed: New IP: {}", actual_ip));
-            self.current = actual_ip;
-            self.changed = true;
+            return Ok(true);
         } else {
             logger.debug("IP address did not change");
         }
-        Ok(())
+        Ok(false)
     }
 
-    fn write_current_ip_to_file(&self) -> Result<(), std::io::Error> {
-        let mut file = File::create(&self.filename)?;
-        file.write_all(format!("{}", self.current).as_bytes())?;
-        Ok(())
-    }
-
-    pub fn new(filename: &str) -> IP {
-        let ip_result = IP::from_file(filename);
-        match ip_result {
-            Ok(ip) => ip,
-            Err(_) => IP {
-                current: Ipv4Addr::from_str("0.0.0.0").expect("can create IP from hardcoded str"),
-                changed: false,
-                filename: filename.to_string(),
-            },
+    pub fn new(domain: &str) -> IP {
+        IP {
+            domain: domain.to_string(),
         }
-    }
-
-    pub fn load(filename: String) -> IP {
-        let f = filename.as_str();
-        IP::new(f)
-    }
-
-    fn from_file(file: &str) -> Result<IP, crate::error::DynamicError> {
-        let logger = logging::Logger::new();
-        let handle_result = File::open(file);
-        let mut handle = match handle_result {
-            Ok(f) => f,
-            Err(_) => {
-                logger.warning(&format!("Created new '{}' file in working directory.", &file));
-                let mut f = File::create(file)?;
-                f.write_all(b"0.0.0.0")?;
-                File::open(file)?
-            }
-        };
-        let mut contents = String::new();
-        handle.read_to_string(&mut contents)?;
-        Ok(IP {
-            current: Ipv4Addr::from_str(&contents)?,
-            changed: false,
-            filename: file.to_string(),
-        })
     }
 }
 
-impl Drop for IP {
-    fn drop(&mut self) {
-        let logger = logging::Logger::new();
-        match self.write_current_ip_to_file() {
-            Ok(_) => (),
-            Err(err) => logger.error(&format!("Error writing IP to file\n{:#?}", err)),
-        };
+fn trim_newline(s: &mut String) {
+    if s.ends_with('\n') {
+        s.pop();
+        if s.ends_with('\r') {
+            s.pop();
+        }
     }
 }
