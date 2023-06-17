@@ -169,7 +169,7 @@ impl APIClient {
 
         let protocol = Protocol::from_server(server);
 
-        let checker = Arc::new(Mutex::new(crate::ip_checker::IP::new(domain)));
+        let checker = Arc::new(Mutex::new(crate::ip_checker::IP::new()));
 
         return Self {
             domain: domain.to_string(),
@@ -185,7 +185,7 @@ impl APIClient {
 
     pub async fn make_request(&self) -> Result<(), crate::error::DynamicError> {
         let checker = Arc::clone(&self.checker);
-        let changed = checker.lock().unwrap().compare().await?;
+        let changed = checker.lock().unwrap().compare(&self.domain).await?;
         if !changed {
             return Ok(());
         }

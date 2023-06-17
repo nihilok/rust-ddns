@@ -7,7 +7,7 @@ const V4_URL: &'static str = "https://api4.ipify.org";
 
 #[derive(Debug)]
 pub struct IP {
-    pub domain: String,
+    actual: Option<Ipv4Addr>,
 }
 
 impl IP {
@@ -26,20 +26,31 @@ impl IP {
         }
     }
 
-    pub async fn compare(&self) -> Result<bool, crate::error::DynamicError> {
+    pub async fn compare(&mut self, domain: &str) -> Result<bool, crate::error::DynamicError> {
         let logger = logging::Logger::new();
-        let actual = IP::get_actual_ip().await?;
-        let current = match IP::get_previous_ip(&self.domain).await {
+        let current = match IP::get_previous_ip(domain).await {
             Ok(output) => output,
             Err(err) => return Err(Box::new(err)),
         };
         logger.debug(&format!("dig returned IP address: '{}'", current));
-        logger.debug(&format!("ipify returned IP address: '{}'", actual));
-
-        let actual_ip = Ipv4Addr::from_str(&actual)?;
         let current_ip = Ipv4Addr::from_str(&current)?;
-        if actual_ip != current_ip {
-            logger.info(&format!("IP address changed: New IP: {}", actual_ip));
+
+        match self.actual {
+            None => {
+                self.actual = Some(Ipv4Addr::from_str(IP::get_actual_ip().await?.as_str())?);
+                logger.debug(&format!(
+                    "ipify returned IP address: '{}'",
+                    self.actual.unwrap().to_string()
+                ));
+            }
+            Some(_ip) => ()
+        }
+
+        if self.actual != Some(current_ip) {
+            logger.info(&format!(
+                "IP address changed: New IP: {}",
+                self.actual.unwrap().to_string()
+            ));
             return Ok(true);
         } else {
             logger.debug("IP address did not change");
@@ -47,9 +58,9 @@ impl IP {
         Ok(false)
     }
 
-    pub fn new(domain: &str) -> IP {
+    pub fn new() -> IP {
         IP {
-            domain: domain.to_string(),
+            actual: None,
         }
     }
 }
