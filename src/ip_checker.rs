@@ -22,10 +22,10 @@ impl IP {
 
     pub async fn compare(&mut self) -> Result<(), crate::error::DynamicError> {
         let logger = logging::Logger::new();
-        logger.debug(&format!("Saved IP address '{}'", &self.current));
+        logger.debug(&format!("IP address saved locally: '{}'", &self.current));
         logger.debug(&format!("Making request to {}", V4_URL));
         let actual = IP::get_actual_ip().await?;
-        logger.debug(&format!("Request returned IP address '{}'", actual));
+        logger.debug(&format!("Request returned IP address: '{}'", actual));
         let actual_ip = Ipv4Addr::from_str(&actual)?;
         if actual_ip != self.current {
             logger.info(&format!("IP address changed: New IP: {}", actual_ip));
@@ -61,10 +61,12 @@ impl IP {
     }
 
     fn from_file(file: &str) -> Result<IP, crate::error::DynamicError> {
+        let logger = logging::Logger::new();
         let handle_result = File::open(file);
         let mut handle = match handle_result {
             Ok(f) => f,
             Err(_) => {
+                logger.warning(&format!("Created new '{}' file in working directory.", &file));
                 let mut f = File::create(file)?;
                 f.write_all(b"0.0.0.0")?;
                 File::open(file)?

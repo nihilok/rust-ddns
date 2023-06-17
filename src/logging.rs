@@ -4,7 +4,7 @@ use crate::{time_tools, LOG_LEVEL};
 pub enum LogLevel {
     DEBUG,
     INFO,
-//    WARNING,
+    WARNING,
     ERROR,
 }
 
@@ -27,15 +27,15 @@ impl Logger {
         }
     }
     pub fn debug(&self, message: &str) {
-        if self.level == LogLevel::DEBUG {
+        if self.level <= LogLevel::DEBUG {
             self.print_log("DEBUG", message)
         }
     }
-//    pub fn warning(&self, message: &str) {
-//        if self.level <= LogLevel::WARNING {
-//            self.print_log("WARNING", message)
-//        }
-//    }
+    pub fn warning(&self, message: &str) {
+        if self.level <= LogLevel::WARNING {
+            self.print_log("WARNING", message)
+        }
+    }
     pub fn error(&self, message: &str) {
         if self.level <= LogLevel::ERROR {
             let newline = if message.ends_with("\n") { "" } else { "\n" };
