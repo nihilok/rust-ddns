@@ -21,7 +21,10 @@ impl IP {
                 let logger = crate::logging::Logger::new();
                 let mut result = output.output().to_string();
                 trim_newline(&mut result);
-                logger.debug(&format!("dig returned IP address: '{}' for domain: '{}'", result, domain));
+                logger.debug(&format!(
+                    "dig returned IP address: '{}' for domain: '{}'",
+                    result, domain
+                ));
                 Ok(result)
             }
             Err(_) => todo!(),
@@ -49,19 +52,18 @@ impl IP {
     }
 
     pub fn new() -> IP {
-        IP {
-            actual: None,
-        }
+        IP { actual: None }
     }
 
     pub async fn set_actual(&mut self) {
         if self.actual.is_none() {
-            self.actual = Some(Ipv4Addr::from_str(IP::get_actual_ip().await.unwrap().as_str()).unwrap());
+            self.actual =
+                Some(Ipv4Addr::from_str(IP::get_actual_ip().await.unwrap().as_str()).unwrap());
             let logger = crate::logging::Logger::new();
             logger.debug(&format!(
                 "ipify returned IP address: '{}'",
-                    self.actual.unwrap().to_string()
-                ));
+                self.actual.unwrap().to_string()
+            ));
         }
     }
 }

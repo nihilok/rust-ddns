@@ -5,7 +5,8 @@ use std::{
     io::Read,
     net::{IpAddr, Ipv6Addr},
     process,
-    str::FromStr, sync::Arc,
+    str::FromStr,
+    sync::Arc,
 };
 
 use reqwest::{header, RequestBuilder};
