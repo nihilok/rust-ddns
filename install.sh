@@ -28,6 +28,7 @@ Description=Run rust-ddns once
 
 [Service]
 User=$USER
+WorkingDir=$HOME
 ExecStart=$CURRENT_DIR/$RUN_SCRIPT
 Environment=HOME=$HOME
 Environment=PATH=$HOME/.local/bin:$PATH
