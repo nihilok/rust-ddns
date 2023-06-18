@@ -11,6 +11,7 @@ use std::{
 
 use clap::Parser;
 use futures::future;
+use reqwest;
 use reqwest::{header, RequestBuilder};
 use yaml_rust::{Yaml, YamlLoader};
 
