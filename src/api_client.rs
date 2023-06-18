@@ -174,7 +174,6 @@ impl APIClient {
             .collect();
 
         let protocol = Protocol::from_server(server);
-        let checker = Rc::clone(&checker);
 
         return Self {
             domain: domain.to_string(),
