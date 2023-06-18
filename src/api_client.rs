@@ -9,6 +9,7 @@ use std::{
     sync::Arc,
 };
 
+use clap::Parser;
 use reqwest::{header, RequestBuilder};
 use yaml_rust::{Yaml, YamlLoader};
 
@@ -183,7 +184,7 @@ impl APIClient {
         };
     }
 
-    pub async fn make_request(&self) -> Result<(), crate::error::DynamicError> {
+    pub async fn execute_protocol(&self) -> Result<(), crate::error::DynamicError> {
         let changed = &self.checker.compare(&self.domain).await?;
         if !changed {
             return Ok(());
@@ -245,75 +246,82 @@ impl APIClient {
         Ok(())
     }
 
-    fn load_file(file: &str) -> Vec<Yaml> {
-        let logger = crate::logging::Logger::new();
-        let mut handle = match File::open(file) {
-            Ok(f) => f,
-            Err(_) => {
-                logger.error(&format!("Could not load config file {}", file));
-                std::process::exit(1)
-            }
-        };
-        let mut contents = String::new();
+    pub async fn from_config_file(filename: String) -> Vec<APIClient> {
+        let yaml = load_yaml_from_file(&filename);
+        let yaml = yaml.clone();
+        parse_yaml(yaml, filename).await
+    }
+}
 
-        match handle.read_to_string(&mut contents) {
-            Ok(_) => (),
-            Err(err) => {
-                logger.debug(&format!("{:#?}", err));
-                std::process::exit(1)
-            }
+fn load_yaml_from_file(file: &str) -> Vec<Yaml> {
+    let logger = crate::logging::Logger::new();
+    let mut handle = match File::open(file) {
+        Ok(f) => f,
+        Err(_) => {
+            logger.error(&format!("Could not load config file {}", file));
+            std::process::exit(1)
         }
+    };
+    let mut contents = String::new();
 
-        YamlLoader::load_from_str(&contents).expect("Unable to parse YAML")
+    match handle.read_to_string(&mut contents) {
+        Ok(_) => (),
+        Err(err) => {
+            logger.debug(&format!("{:#?}", err));
+            std::process::exit(1)
+        }
     }
 
-    async fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
-        let mut checker = crate::ip_checker::IP::new();
-        checker.set_actual().await;
-        let checker = Arc::new(checker);
-        let logger = Logger::new();
-        let mut config = Vec::new();
-        for doc in docs.iter() {
-            let username;
-            let password;
-            let server;
-            let domain;
-            match doc["username"].as_str() {
-                Some(result) => username = result,
-                None => {
-                    logger.error(&format!("'username' should be in {}", file));
-                    process::exit(1);
-                }
-            };
-            match doc["password"].as_str() {
-                Some(result) => password = result,
-                None => {
-                    logger.error(&format!("'password' should be in {}", file));
-                    process::exit(1);
-                }
-            };
-            match doc["server"].as_str() {
-                Some(result) => server = result,
-                None => {
-                    logger.error(&format!("'server' should be in {}", file));
-                    process::exit(1);
-                }
-            };
-            match doc["domain"].as_str() {
-                Some(result) => domain = result,
-                None => {
-                    logger.error(&format!("'domain' should be in {}", file));
-                    process::exit(1);
-                }
-            };
+    YamlLoader::load_from_str(&contents).expect("Unable to parse YAML")
+}
 
-            let credentials = Credentials::new(username.to_string(), password.to_string());
+async fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
+    let mut checker = crate::ip_checker::IP::new();
+    checker.set_actual().await;
+    let checker = Arc::new(checker);
+    let logger = Logger::new();
+    let mut config = Vec::new();
+    for doc in docs.iter() {
+        let username;
+        let password;
+        let server;
+        let domain;
+        match doc["username"].as_str() {
+            Some(result) => username = result,
+            None => {
+                logger.error(&format!("'username' should be in {}", file));
+                process::exit(1);
+            }
+        };
+        match doc["password"].as_str() {
+            Some(result) => password = result,
+            None => {
+                logger.error(&format!("'password' should be in {}", file));
+                process::exit(1);
+            }
+        };
+        match doc["server"].as_str() {
+            Some(result) => server = result,
+            None => {
+                logger.error(&format!("'server' should be in {}", file));
+                process::exit(1);
+            }
+        };
+        match doc["domain"].as_str() {
+            Some(result) => domain = result,
+            None => {
+                logger.error(&format!("'domain' should be in {}", file));
+                process::exit(1);
+            }
+        };
 
-            let methods: Vec<&str>;
+        let credentials = Credentials::new(username.to_string(), password.to_string());
 
-            match doc["methods"].as_vec() {
-                Some(methods_vec) => {
-                    methods = methods_vec
+        let methods: Vec<&str>;
+
+        match doc["methods"].as_vec() {
+            Some(methods_vec) => {
+                methods = methods_vec
                         .iter()
                         .map(|m| match m.as_str() {
                             Some(method) => method,
@@ -324,16 +332,16 @@ impl APIClient {
                             }
                         })
                         .collect()
-                }
-                None => {
-                    logger.error(&format!("'methods' (list) should be in {}", file));
-                    process::exit(1);
-                }
             }
+            None => {
+                logger.error(&format!("'methods' (list) should be in {}", file));
+                process::exit(1);
+            }
+        }
 
-            let records = doc["records"].as_vec();
-            let records = match records {
-                Some(v) => v
+        let records = doc["records"].as_vec();
+        let records = match records {
+            Some(v) => v
                     .iter()
                     .map(|r| match r.as_str() {
                         Some(record) => record,
@@ -343,18 +351,41 @@ impl APIClient {
                         }
                     })
                     .collect(),
-                None => vec!["a"],
-            };
-            let checker_clone = Arc::clone(&checker);
-            let api = APIClient::new(server, domain, methods, records, credentials, checker_clone);
-            config.push(api)
-        }
-        config
+            None => vec!["a"],
+        };
+        let checker_clone = Arc::clone(&checker);
+        let api = APIClient::new(server, domain, methods, records, credentials, checker_clone);
+        config.push(api)
     }
+    config
+}
 
-    pub async fn from_config_file(filename: String) -> Vec<APIClient> {
-        let yaml = APIClient::load_file(&filename);
-        let yaml = yaml.clone();
-        APIClient::parse_yaml(yaml, filename).await
+pub fn get_config_file_path() -> String {
+    let logger = crate::logging::Logger::new();
+    let args = crate::arg_parser::Args::parse();
+    let mut path = std::env::var("HOME").unwrap_or("".to_string());
+    build_config_path(&mut path);
+    let file = args.config_file.unwrap_or(path);
+    logger.debug(&format!("Using config file '{}'", &file));
+    file
+}
+
+#[cfg(not(target_os = "windows"))]
+fn build_config_path(path: &mut String) {
+    use crate::DEFAULT_CONFIG_FILE;
+
+    if path.len() > 0 {
+        path.push_str("/")
     }
+    path.push_str(DEFAULT_CONFIG_FILE);
+}
+
+#[cfg(target_os = "windows")]
+fn build_config_path(path: &mut String) {
+    use crate::DEFAULT_CONFIG_FILE;
+
+    if path.len() > 0 {
+        path.push_str("\\")
+    }
+    path.push_str(DEFAULT_CONFIG_FILE);
 }
