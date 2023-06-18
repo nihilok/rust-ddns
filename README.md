@@ -13,7 +13,7 @@
 
 ```sh
 sudo systemctl enable rust-ddns.timer
-sudo sytemctl start rust-ddns.timer
+sudo systemctl start rust-ddns.timer
 ```
 
 ## Debugging
