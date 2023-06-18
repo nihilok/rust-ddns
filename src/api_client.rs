@@ -10,6 +10,7 @@ use std::{
 };
 
 use clap::Parser;
+use futures::future;
 use reqwest::{header, RequestBuilder};
 use yaml_rust::{Yaml, YamlLoader};
 
@@ -189,6 +190,7 @@ impl APIClient {
         if !changed {
             return Ok(());
         }
+        let mut calls = Vec::new();
         for record in &mut self.records.iter() {
             let request_url =
                 self.protocol
@@ -211,23 +213,28 @@ impl APIClient {
                     .local_address(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)))
                     .build()?,
             };
+            calls.push(self.call_all_methods(client, request_url, record))
+        }
+        future::join_all(calls).await;
+        Ok(())
+    }
 
-            for method in &self.methods {
-                match method {
-                    Method::POST => {
-                        let client = client.post(&request_url);
-                        self.manage_request(client, method, record).await?;
-                    }
-                    Method::DELETE => {
-                        let client = client.delete(&request_url);
-                        self.manage_request(client, method, record).await?;
-                    }
-                    Method::PUT => {
-                        let client = client.put(&request_url);
-                        self.manage_request(client, method, record).await?;
-                    }
-                };
-            }
+    async fn call_all_methods(&self, client: reqwest::Client, url: String, record: &Record) -> Result<(), reqwest::Error> {
+        for method in &self.methods {
+            match method {
+                Method::POST => {
+                    let client = client.post(&url);
+                    self.manage_request(client, method, record).await?;
+                }
+                Method::DELETE => {
+                    let client = client.delete(&url);
+                    self.manage_request(client, method, record).await?;
+                }
+                Method::PUT => {
+                    let client = client.put(&url);
+                    self.manage_request(client, method, record).await?;
+                }
+            };
         }
         Ok(())
     }
