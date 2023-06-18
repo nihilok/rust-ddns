@@ -187,7 +187,7 @@ impl APIClient {
         };
     }
 
-    pub async fn execute_protocol(&self) -> Result<(), crate::error::DynamicError> {
+    pub async fn execute(&self) -> Result<(), crate::error::DynamicError> {
         let changed = &self.checker.compare(&self.domain).await?;
         if !changed {
             return Ok(());
@@ -255,7 +255,8 @@ impl APIClient {
         Ok(())
     }
 
-    pub async fn from_config_file(filename: String) -> Vec<APIClient> {
+    pub async fn from_config_file() -> Vec<APIClient> {
+        let filename = get_config_file_path();
         let yaml = load_yaml_from_file(&filename);
         let yaml = yaml.clone();
         parse_yaml(yaml, filename).await
