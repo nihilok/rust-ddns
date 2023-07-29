@@ -46,6 +46,10 @@ records:                    # optional, defaults to A
     - AAAA
 username: api-key/username
 password: api-secret/password
+---                         # multiple configs split by line break
+server: my.other.dns.provider
+domain: my.other.domain.com
+...  
 ```
 
 The above example config would make 6 calls to the same server, one for each method for each record type. You can provide between 1 and 3 methods, either PUT, POST, or DELETE.
