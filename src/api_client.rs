@@ -6,12 +6,15 @@ use std::{
     net::{IpAddr, Ipv6Addr},
     process,
     str::FromStr,
-    sync::Arc,
+    rc::Rc,
 };
 
 use futures::future;
+use reqwest;
 use reqwest::{header, RequestBuilder};
 use yaml_rust::{Yaml, YamlLoader};
+
+use crate::ip_checker;
 
 #[derive(Debug)]
 struct Credentials {
@@ -127,7 +130,7 @@ pub struct APIClient {
     credentials: Credentials,
     server: String,
     protocol: Protocol,
-    checker: Arc<crate::ip_checker::IP>,
+    checker: Rc<ip_checker::IP>,
     logger: Logger,
 }
 
@@ -138,8 +141,8 @@ impl APIClient {
         methods: Vec<&str>,
         records: Vec<&str>,
         credentials: Credentials,
-        checker: Arc<crate::ip_checker::IP>,
-    ) -> Self {
+        checker: Rc<ip_checker::IP>,
+        ) -> APIClient {
         let logger = Logger::new();
 
         let methods: Vec<Method> = methods
@@ -184,7 +187,7 @@ impl APIClient {
         };
     }
 
-    pub async fn execute_protocol(&self) -> Result<(), crate::error::DynamicError> {
+    pub async fn execute(&self) -> Result<(), crate::error::DynamicError> {
         let changed = &self.checker.compare(&self.domain).await?;
         if !changed {
             return Ok(());
@@ -252,7 +255,8 @@ impl APIClient {
         Ok(())
     }
 
-    pub async fn from_config_file(filename: String) -> Vec<APIClient> {
+    pub async fn from_config_file() -> Vec<APIClient> {
+        let filename = get_config_file_path();
         let yaml = load_yaml_from_file(&filename);
         let yaml = yaml.clone();
         parse_yaml(yaml, filename).await
@@ -284,7 +288,7 @@ fn load_yaml_from_file(file: &str) -> Vec<Yaml> {
 async fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
     let mut checker = crate::ip_checker::IP::new();
     checker.set_actual().await;
-    let checker = Arc::new(checker);
+    let checker = Rc::new(checker);
     let logger = Logger::new();
     let mut config = Vec::new();
     for doc in docs.iter() {
@@ -359,7 +363,7 @@ async fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
                     .collect(),
             None => vec!["a"],
         };
-        let checker_clone = Arc::clone(&checker);
+        let checker_clone = Rc::clone(&checker);
         let api = APIClient::new(server, domain, methods, records, credentials, checker_clone);
         config.push(api)
     }

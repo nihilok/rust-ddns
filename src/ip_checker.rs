@@ -1,6 +1,7 @@
 use command_line;
 use std::{net::Ipv4Addr, str::FromStr};
 use command_line::Errors;
+use reqwest;
 
 use crate::logging;
 

@@ -21,17 +21,18 @@ Unit=rust-ddns.service
 
 [Install]
 WantedBy=multi-user.target
-" | sudo tee /etc/systemd/system/rust-ddns.timer
+" | sudo tee /etc/systemd/system/rust-ddns.timer >/dev/null
 echo "\
 [Unit]
-User=$USER
 Description=Run rust-ddns once
 
 [Service]
+User=$USER
+WorkingDir=$HOME
 ExecStart=$CURRENT_DIR/$RUN_SCRIPT
 Environment=HOME=$HOME
-Environment=PATH=$HOME/.local/bin
-" | sudo tee /etc/systemd/system/rust-ddns.service
+Environment=PATH=$HOME/.local/bin:$PATH
+" | sudo tee /etc/systemd/system/rust-ddns.service >/dev/null
 
 cargo build --release
 
