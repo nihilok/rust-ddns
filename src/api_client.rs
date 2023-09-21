@@ -255,8 +255,7 @@ impl APIClient {
         Ok(())
     }
 
-    pub async fn from_config_file() -> Vec<APIClient> {
-        let filename = get_config_file_path();
+    pub async fn from_config_file(filename: String) -> Vec<APIClient> {
         let yaml = load_yaml_from_file(&filename);
         let yaml = yaml.clone();
         parse_yaml(yaml, filename).await
