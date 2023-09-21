@@ -9,7 +9,6 @@ use std::{
     sync::Arc,
 };
 
-use clap::Parser;
 use futures::future;
 use reqwest::{header, RequestBuilder};
 use yaml_rust::{Yaml, YamlLoader};
@@ -367,14 +366,15 @@ async fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
     config
 }
 
-pub fn get_config_file_path() -> String {
-    let logger = crate::logging::Logger::new();
-    let args = crate::arg_parser::Args::parse();
-    let mut path = std::env::var("HOME").unwrap_or("".to_string());
-    build_config_path(&mut path);
-    let file = args.config_file.unwrap_or(path);
-    logger.debug(&format!("Using config file '{}'", &file));
-    file
+pub fn get_config_file_path(user_file_path: Option<String>) -> String {
+    let logger = Logger::new();
+    let file_path = user_file_path.unwrap_or_else(|| {
+        let mut path = std::env::var("HOME").unwrap_or("".to_string());
+        build_config_path(&mut path);
+        path
+    });
+    logger.debug(&format!("Using config file '{}'", &file_path));
+    file_path
 }
 
 #[cfg(not(target_os = "windows"))]

@@ -1,5 +1,6 @@
 use command_line;
 use std::{net::Ipv4Addr, str::FromStr};
+use command_line::Errors;
 
 use crate::logging;
 
@@ -20,6 +21,14 @@ impl IP {
             Ok(output) => {
                 let logger = crate::logging::Logger::new();
                 let mut result = output.output().to_string();
+                if output.exit_code() == &1u8 {
+                    let error_message = format!(
+                        "dig command returned non-zero exit code\n'{}'",
+                        result
+                    );
+                    logger.error(&error_message);
+                    return Err(Errors::Custom(error_message));
+                }
                 trim_newline(&mut result);
                 logger.debug(&format!(
                     "dig returned IP address: '{}' for domain: '{}'",
@@ -27,7 +36,7 @@ impl IP {
                 ));
                 Ok(result)
             }
-            Err(_) => todo!(),
+            Err(err) => Err(err),
         }
     }
 

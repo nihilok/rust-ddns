@@ -1,6 +1,8 @@
 use futures::future;
 use tokio;
 use api_client::APIClient;
+use arg_parser::Args;
+use clap::Parser;
 
 mod api_client;
 mod arg_parser;
@@ -13,7 +15,8 @@ const DEFAULT_CONFIG_FILE: &'static str = ".ddns.conf";
 
 #[tokio::main]
 async fn main() -> Result<(), error::DynamicError> {
-    let file = api_client::get_config_file_path();
+    let args = Args::parse();
+    let file = api_client::get_config_file_path(args.config_file);
     let mut config = APIClient::from_config_file(file).await;
     let mut futures = Vec::new();
     for api in config.iter_mut() {

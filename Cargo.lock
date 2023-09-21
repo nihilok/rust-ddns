@@ -174,7 +174,7 @@ checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 [[package]]
 name = "command_line"
 version = "0.1.0"
-source = "git+https://github.com/nihilok/rust-command-line.git#90d91293f362dc44d3a7a974d45d376140fb390b"
+source = "git+https://github.com/nihilok/rust-command-line.git#dc7194a32a4030a3e51126e59fd6334a14bacda7"
 
 [[package]]
 name = "core-foundation"
