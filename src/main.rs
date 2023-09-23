@@ -15,6 +15,12 @@ const DEFAULT_CONFIG_FILE: &'static str = ".ddns.conf";
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), error::DynamicError> {
     let args = Args::parse();
+
+    if args.ip {
+        println!("{}", ip_checker::IP::get_actual_ip().await?);
+        return Ok(())
+    }
+
     let file = api_client::get_config_file_path(args.config_file);
     let mut config = APIClient::from_config_file(file).await;
     let mut futures = Vec::new();

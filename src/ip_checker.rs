@@ -1,6 +1,5 @@
 use command_line;
 use std::{net::Ipv4Addr, str::FromStr};
-use command_line::Errors;
 use reqwest;
 
 use crate::logging;
@@ -13,23 +12,15 @@ pub struct IP {
 }
 
 impl IP {
-    async fn get_actual_ip() -> Result<String, reqwest::Error> {
+    pub async fn get_actual_ip() -> Result<String, reqwest::Error> {
         Ok(reqwest::get(V4_URL).await?.text().await?)
     }
 
     async fn get_previous_ip(domain: &str) -> Result<String, command_line::Errors> {
-        match command_line::execute_command(&format!("dig +short {}", domain)) {
+        let logger = logging::Logger::new();
+        match command_line::sh(&format!("dig +short {}", domain)) {
             Ok(output) => {
-                let logger = crate::logging::Logger::new();
-                let mut result = output.output().to_string();
-                if output.exit_code() == &1u8 {
-                    let error_message = format!(
-                        "dig command returned non-zero exit code\n'{}'",
-                        result
-                    );
-                    logger.error(&error_message);
-                    return Err(Errors::Custom(error_message));
-                }
+                let mut result = output;
                 trim_newline(&mut result);
                 logger.debug(&format!(
                     "dig returned IP address: '{}' for domain: '{}'",
@@ -37,7 +28,9 @@ impl IP {
                 ));
                 Ok(result)
             }
-            Err(err) => Err(err),
+            Err(err) => {
+                logger.error(&format!("dig command failed with output: {}", err));
+                Err(err) },
         }
     }
 

@@ -5,4 +5,6 @@ use clap::{command, Parser};
 pub struct Args {
     #[arg(short, long)]
     pub config_file: Option<String>,
+    #[arg(short, long)]
+    pub ip: bool,
 }
