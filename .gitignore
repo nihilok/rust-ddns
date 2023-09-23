@@ -2,3 +2,7 @@ test.conf
 target/
 .ip
 run.json
+/.idea/.gitignore
+/.idea/modules.xml
+/.idea/rust-ddns.iml
+/.idea/vcs.xml
