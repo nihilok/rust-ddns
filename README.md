@@ -7,7 +7,7 @@
 
 ### Installation
 
-`./install.sh` or `RUST_DDNS_INTERVAL=30min ./install.sh`
+`sudo ./install.sh` or `RUST_DDNS_INTERVAL=30min sudo ./install.sh`
 
 (default interval is `5min`)
 
