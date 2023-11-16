@@ -38,7 +38,10 @@ cargo build --release
 
 mkdir -p $HOME/.local/bin
 
-ln -s $CURRENT_DIR/target/release/rust-ddns $HOME/.local/bin/rust-ddns
+SYMBOLIC_LINK_PATH="$HOME/.local/bin/rust-ddns"
+if [[ ! -f $SYMBOLIC_LINK_PATH ]]; then
+    ln -s $CURRENT_DIR/target/release/rust-ddns $SYMBOLIC_LINK_PATH
+fi
 
 sudo systemctl daemon-reload
 
