@@ -286,7 +286,14 @@ fn load_yaml_from_file(file: &str) -> Vec<Yaml> {
 
 async fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
     let mut checker = crate::ip_checker::IP::new();
-    checker.set_actual().await;
+    match checker.set_actual().await {
+        Ok(_) => {}
+        Err(err) => {
+            let logger = Logger::new();
+            logger.error(&format!("{}", err));
+            process::exit(1)
+        }
+    }
     let checker = Rc::new(checker);
     let logger = Logger::new();
     let mut config = Vec::new();
