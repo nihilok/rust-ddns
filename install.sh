@@ -10,7 +10,6 @@ RUST_DDNS_INTERVAL=5min
 fi
 
 if [[ -f 'install.sh' ]] && [[ -f $RUN_SCRIPT ]]; then
-chmod +x $RUN_SCRIPT
 echo "\
 [Unit]
 Description=Runs rust-ddns every 5 minutes
@@ -22,7 +21,7 @@ Unit=rust-ddns.service
 
 [Install]
 WantedBy=multi-user.target
-" | tee /etc/systemd/system/rust-ddns.timer >/dev/null
+" | sudo tee /etc/systemd/system/rust-ddns.timer >/dev/null
 echo "\
 [Unit]
 Description=Run rust-ddns once
@@ -33,7 +32,7 @@ WorkingDir=$HOME
 ExecStart=$CURRENT_DIR/$RUN_SCRIPT
 Environment=HOME=$HOME
 Environment=PATH=$HOME/.local/bin:$PATH
-" | tee /etc/systemd/system/rust-ddns.service >/dev/null
+" | sudo tee /etc/systemd/system/rust-ddns.service >/dev/null
 
 cargo build --release
 
@@ -41,7 +40,7 @@ mkdir -p $HOME/.local/bin
 
 ln -s $CURRENT_DIR/target/release/rust-ddns $HOME/.local/bin/rust-ddns
 
-systemctl daemon-reload
+sudo systemctl daemon-reload
 
 else
 echo "Required files not found. Make sure you are running the script from within the source directory" && exit 1
