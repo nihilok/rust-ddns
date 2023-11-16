@@ -38,11 +38,8 @@ Environment=HOME=$HOME
 Environment=PATH=$HOME/.local/bin:$PATH
 " | sudo tee /etc/systemd/system/rust-ddns.service >/dev/null
 
-    echo "Successfully created rust-ddns timer and service."
-
     echo "Compiling Rust application..."
     cargo build --release
-    echo "Build complete."
 
     mkdir -p $HOME/.local/bin
     SYMBOLIC_LINK_PATH="$HOME/.local/bin/rust-ddns"
