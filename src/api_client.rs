@@ -10,7 +10,6 @@ use std::{
 };
 
 use futures::future;
-use reqwest;
 use reqwest::{header, RequestBuilder};
 use yaml_rust::{Yaml, YamlLoader};
 
@@ -24,7 +23,7 @@ struct Credentials {
 
 impl Credentials {
     fn new(username: String, password: String) -> Credentials {
-        return Self { username, password };
+        Self { username, password }
     }
 
     fn authenticate(&self, client: RequestBuilder) -> RequestBuilder {
@@ -34,23 +33,17 @@ impl Credentials {
 
 #[derive(Debug)]
 enum Method {
-    POST,
-    PUT,
-    DELETE,
+    Post,
+    Put,
+    Delete,
 }
 
 impl Display for Method {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            Method::POST => {
-                write!(f, "POST")
-            }
-            Method::PUT => {
-                write!(f, "PUT")
-            }
-            Method::DELETE => {
-                write!(f, "DELETE")
-            }
+            Method::Post => write!(f, "POST"),
+            Method::Put => write!(f, "PUT"),
+            Method::Delete => write!(f, "DELETE"),
         }
     }
 }
@@ -60,9 +53,9 @@ impl FromStr for Method {
 
     fn from_str(input: &str) -> Result<Method, Self::Err> {
         match input.to_lowercase().as_str() {
-            "post" => Ok(Method::POST),
-            "put" => Ok(Method::PUT),
-            "delete" => Ok(Method::DELETE),
+            "post" => Ok(Method::Post),
+            "put" => Ok(Method::Put),
+            "delete" => Ok(Method::Delete),
             _ => Err(()),
         }
     }
@@ -70,18 +63,14 @@ impl FromStr for Method {
 #[derive(Debug)]
 enum Record {
     A,
-    AAAA,
+    Aaaa,
 }
 
 impl Display for Record {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            Record::A => {
-                write!(f, "A")
-            }
-            Record::AAAA => {
-                write!(f, "AAAA")
-            }
+            Record::A => write!(f, "A"),
+            Record::Aaaa => write!(f, "AAAA"),
         }
     }
 }
@@ -92,7 +81,7 @@ impl FromStr for Record {
     fn from_str(input: &str) -> Result<Record, Self::Err> {
         match input.to_lowercase().as_str() {
             "a" => Ok(Record::A),
-            "aaaa" => Ok(Record::AAAA),
+            "aaaa" => Ok(Record::Aaaa),
             _ => Err(()),
         }
     }
@@ -184,7 +173,7 @@ impl APIClient {
 
         let protocol = Protocol::from_server(server);
 
-        return Self {
+        Self {
             domain: domain.to_string(),
             server: server.to_string(),
             methods,
@@ -194,7 +183,7 @@ impl APIClient {
             api_token,
             checker,
             logger,
-        };
+        }
     }
 
     pub async fn execute(&self) -> Result<(), crate::error::DynamicError> {
@@ -229,7 +218,7 @@ impl APIClient {
                 Record::A => client_builder
                     .local_address(IpAddr::from_str("0.0.0.0")?)
                     .build()?,
-                Record::AAAA => client_builder
+                Record::Aaaa => client_builder
                     .local_address(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)))
                     .build()?,
             };
@@ -338,7 +327,7 @@ impl APIClient {
 
     async fn execute_namecheap(&self) -> Result<(), crate::error::DynamicError> {
         for record in &self.records {
-            if let Record::AAAA = record {
+            if let Record::Aaaa = record {
                 let msg = "Namecheap DDNS does not support AAAA records";
                 self.logger.error(msg);
                 return Err(msg.into());
@@ -393,15 +382,15 @@ impl APIClient {
     async fn call_all_methods(&self, client: reqwest::Client, url: String, record: &Record) -> Result<(), reqwest::Error> {
         for method in &self.methods {
             match method {
-                Method::POST => {
+                Method::Post => {
                     let client = client.post(&url);
                     self.manage_request(client, method, record).await?;
                 }
-                Method::DELETE => {
+                Method::Delete => {
                     let client = client.delete(&url);
                     self.manage_request(client, method, record).await?;
                 }
-                Method::PUT => {
+                Method::Put => {
                     let client = client.put(&url);
                     self.manage_request(client, method, record).await?;
                 }
@@ -495,18 +484,15 @@ async fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
     let logger = Logger::new();
     let mut config = Vec::new();
     for doc in docs.iter() {
-        let server;
-        let domain;
-
-        match doc["server"].as_str() {
-            Some(result) => server = result,
+        let server = match doc["server"].as_str() {
+            Some(result) => result,
             None => {
                 logger.error(&format!("'server' should be in {}", file));
                 process::exit(1);
             }
         };
-        match doc["domain"].as_str() {
-            Some(result) => domain = result,
+        let domain = match doc["domain"].as_str() {
+            Some(result) => result,
             None => {
                 logger.error(&format!("'domain' should be in {}", file));
                 process::exit(1);
@@ -625,8 +611,8 @@ pub fn get_config_file_path(user_file_path: Option<String>) -> String {
 fn build_config_path(path: &mut String) {
     use crate::DEFAULT_CONFIG_FILE;
 
-    if path.len() > 0 {
-        path.push_str("/")
+    if !path.is_empty() {
+        path.push('/');
     }
     path.push_str(DEFAULT_CONFIG_FILE);
 }
@@ -635,8 +621,8 @@ fn build_config_path(path: &mut String) {
 fn build_config_path(path: &mut String) {
     use crate::DEFAULT_CONFIG_FILE;
 
-    if path.len() > 0 {
-        path.push_str("\\")
+    if !path.is_empty() {
+        path.push('\\');
     }
     path.push_str(DEFAULT_CONFIG_FILE);
 }

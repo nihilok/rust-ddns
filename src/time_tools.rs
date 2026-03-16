@@ -7,7 +7,7 @@ pub fn now_as_string() -> String {
 }
 
 fn iso8601(st: &time::SystemTime) -> String {
-    let dt: DateTime<Utc> = st.clone().into();
+    let dt: DateTime<Utc> = (*st).into();
     format!("{}", dt.format("%+"))
     // formats like "2001-07-08T00:34:60.026490+09:30"
 }

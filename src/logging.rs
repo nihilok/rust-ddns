@@ -5,10 +5,10 @@ use crate::time_tools;
 /// Log levels are used to indicate the severity of a log message.
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub enum LogLevel {
-    DEBUG,
-    INFO,
-    WARNING,
-    ERROR,
+    Debug,
+    Info,
+    Warning,
+    Error,
 }
 
 impl From<String> for LogLevel {
@@ -21,16 +21,16 @@ impl From<String> for LogLevel {
     /// # Returns
     ///
     /// Returns a `LogLevel` enum variant corresponding to the given string (after transforming to uppercase):
-    /// - If the string is "DEBUG", returns `LogLevel::DEBUG`.
-    /// - If the string is "WARNING", returns `LogLevel::WARNING`.
-    /// - If the string is "ERROR", returns `LogLevel::ERROR`.
-    /// - For any other string, returns `LogLevel::INFO`.
+    /// - If the string is "DEBUG", returns `LogLevel::Debug`.
+    /// - If the string is "WARNING", returns `LogLevel::Warning`.
+    /// - If the string is "ERROR", returns `LogLevel::Error`.
+    /// - For any other string, returns `LogLevel::Info`.
     fn from(string: String) -> LogLevel {
         match string.to_uppercase().as_str() {
-            "DEBUG" => LogLevel::DEBUG,
-            "WARNING" => LogLevel::WARNING,
-            "ERROR" => LogLevel::ERROR,
-            _ => LogLevel::INFO,
+            "DEBUG" => LogLevel::Debug,
+            "WARNING" => LogLevel::Warning,
+            "ERROR" => LogLevel::Error,
+            _ => LogLevel::Info,
         }
     }
 }
@@ -98,7 +98,7 @@ impl Logger {
             newline
         );
     }
-    /// Prints an info log message if the log level is set to `INFO`.
+    /// Prints an info log message if the log level is set to `Info`.
     ///
     /// # Arguments
     ///
@@ -107,12 +107,12 @@ impl Logger {
     /// # Examples
     ///
     /// ```
-    /// let logger = Logger::new(LogLevel::INFO);
+    /// let logger = Logger::new(LogLevel::Info);
     ///
     /// logger.info("This is an info message");
     /// ```
     pub fn info(&self, message: &str) {
-        if self.level <= LogLevel::INFO {
+        if self.level <= LogLevel::Info {
             self.print_log("INFO", message)
         }
     }
@@ -125,15 +125,15 @@ impl Logger {
     /// # Example
     ///
     /// ```
-    /// let logger = Logger::new(LogLevel::DEBUG);
+    /// let logger = Logger::new(LogLevel::Debug);
     /// logger.debug("This is a debug message");
     /// ```
     pub fn debug(&self, message: &str) {
-        if self.level <= LogLevel::DEBUG {
+        if self.level <= LogLevel::Debug {
             self.print_log("DEBUG", message)
         }
     }
-    /// Prints a warning log message if the log level is equal to or greater than `LogLevel::WARNING`.
+    /// Prints a warning log message if the log level is equal to or greater than `LogLevel::Warning`.
     ///
     /// # Arguments
     ///
@@ -144,15 +144,15 @@ impl Logger {
     /// ```rust
     /// use log::{LogLevel, Logger};
     ///
-    /// let logger = Logger::new(LogLevel::WARNING);
+    /// let logger = Logger::new(LogLevel::Warning);
     /// logger.warning("This is a warning message");
     /// ```
     pub fn warning(&self, message: &str) {
-       if self.level <= LogLevel::WARNING {
+       if self.level <= LogLevel::Warning {
            self.print_log("WARNING", message)
        }
     }
-    /// Logs an error message if the current logging level is equal to or higher than `LogLevel::ERROR`.
+    /// Logs an error message if the current logging level is equal to or higher than `LogLevel::Error`.
     ///
     /// # Arguments
     ///
@@ -167,12 +167,11 @@ impl Logger {
     /// logger.error("An error occurred!");
     /// ```
     pub fn error(&self, message: &str) {
-        if self.level <= LogLevel::ERROR {
+        if self.level <= LogLevel::Error {
             let newline = if message.ends_with("\n") { "" } else { "\n" };
             eprint!(
-                "{} |{}| {}{}",
+                "{} |ERROR| {}{}",
                 time_tools::now_as_string(),
-                "ERROR",
                 message,
                 newline
             );

@@ -1,10 +1,8 @@
-use command_line;
 use std::{net::Ipv4Addr, str::FromStr};
-use reqwest;
 
 use crate::{error, logging};
 
-const V4_URL: &'static str = "https://api4.ipify.org";
+const V4_URL: &str = "https://api4.ipify.org";
 
 /// Struct that encapsulates all the necessary state and implementations needed for
 /// comparing the actual IP of the server it's running on against the current DNS records
@@ -27,10 +25,10 @@ impl IP {
     /// A `Result` which is:
     ///
     /// * `Ok` - A string that represent the current IP address of the machine. When the
-    /// function succeeds, it returns this variant containing the IP address.
+    ///   function succeeds, it returns this variant containing the IP address.
     /// * `Err` - Contains a `reqwest::Error` when there's a failure in getting
-    /// the IP address. For example, if there is no network connection or the ipify
-    /// service is down.
+    ///   the IP address. For example, if there is no network connection or the ipify
+    ///   service is down.
     ///
     /// # Example
     ///
@@ -44,7 +42,7 @@ impl IP {
     /// };
     /// ```
     pub async fn get_actual_ip() -> Result<String, reqwest::Error> {
-        Ok(reqwest::get(V4_URL).await?.text().await?)
+        reqwest::get(V4_URL).await?.text().await
     }
 
     /// Checks the current IP for a domain according to DNS records (depends on dig being installed on the current system)
@@ -77,7 +75,8 @@ impl IP {
             }
             Err(err) => {
                 logger.error(&format!("dig command failed with output: {}", err));
-                Err(err) },
+                Err(err)
+            }
         }
     }
 
@@ -120,16 +119,16 @@ impl IP {
             Ok(output) => output,
             Err(err) => return Err(Box::new(err)),
         };
-        let current_ip;
-        if current == "" {
-            current_ip = None
-        }
-        else{ current_ip = Some(Ipv4Addr::from_str(&current)?) }
+        let current_ip = if current.is_empty() {
+            None
+        } else {
+            Some(Ipv4Addr::from_str(&current)?)
+        };
 
         if self.actual != current_ip {
             logger.info(&format!(
                 "IP address changed: New IP: {}",
-                self.actual.unwrap().to_string()
+                self.actual.unwrap()
             ));
             return Ok(true);
         } else {
@@ -167,14 +166,14 @@ impl IP {
     ///     Err(e) => println!("Failed to set the actual IP: {:?}", e),
     /// }
     /// ```
-    pub async fn set_actual(&mut self) -> Result<(), error::DynamicError>  {
+    pub async fn set_actual(&mut self) -> Result<(), error::DynamicError> {
         if self.actual.is_none() {
             self.actual =
                 Some(Ipv4Addr::from_str(IP::get_actual_ip().await?.as_str())?);
             let logger = crate::logging::Logger::new();
             logger.debug(&format!(
                 "ipify returned IP address: '{}'",
-                self.actual.unwrap().to_string()
+                self.actual.unwrap()
             ));
         }
         Ok(())

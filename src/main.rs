@@ -12,7 +12,7 @@ mod ip_checker;
 mod logging;
 mod time_tools;
 
-const DEFAULT_CONFIG_FILE: &'static str = ".ddns.conf";
+const DEFAULT_CONFIG_FILE: &str = ".ddns.conf";
 
 
 async fn log_and_ignore_errors<F>(fut: F)
