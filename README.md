@@ -110,6 +110,22 @@ Migration steps:
 2. Create a Cloudflare API token with `Zone:DNS:Edit` permission
 3. Update your config to use `server: cloudflare` and `api_token`
 
+### Namecheap
+
+```yaml
+server: namecheap
+domain: host.example.com
+password: env:NAMECHEAP_DDNS_PASSWORD
+records:
+    - A
+```
+
+- `server: namecheap` enables the Namecheap DDNS protocol
+- `password` is the Namecheap DDNS password (plain text or `env:` reference); `username` is not used
+- Only A records are supported (AAAA is not supported by Namecheap DDNS)
+- The host portion is extracted from the domain automatically (e.g. `host` from `host.example.com`)
+- For apex domains, set `domain: example.com` and the host will be sent as `@`
+
 ### Secure Credential Storage
 
 Passwords (and usernames) can be read from environment variables at runtime using the `env:` prefix:

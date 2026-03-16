@@ -1,7 +1,7 @@
 # FR0005 — Namecheap DDNS Support
 
 ## Status
-Draft
+Implemented
 
 ## Summary
 Add support for Namecheap's Dynamic DNS API as a new protocol variant.

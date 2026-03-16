@@ -101,6 +101,7 @@ impl FromStr for Record {
 #[derive(Debug, PartialEq)]
 enum Protocol {
     Cloudflare,
+    Namecheap,
     MailInABox,
 }
 
@@ -108,6 +109,7 @@ impl Protocol {
     fn build_url(&self, server: &str, domain: &str, record: &str) -> String {
         match self {
             Protocol::Cloudflare => String::new(),
+            Protocol::Namecheap => String::new(),
             Protocol::MailInABox => {
                 format!("https://{server}/admin/dns/custom/{domain}/{record}")
             }
@@ -121,6 +123,7 @@ impl Protocol {
                 std::process::exit(1);
             }
             "cloudflare" => Self::Cloudflare,
+            "namecheap" => Self::Namecheap,
             _ => Self::MailInABox,
         }
     }
@@ -197,6 +200,10 @@ impl APIClient {
     pub async fn execute(&self) -> Result<(), crate::error::DynamicError> {
         if self.protocol == Protocol::Cloudflare {
             return self.execute_cloudflare().await;
+        }
+
+        if self.protocol == Protocol::Namecheap {
+            return self.execute_namecheap().await;
         }
 
         let changed = &self.checker.compare(&self.domain).await?;
@@ -329,6 +336,54 @@ impl APIClient {
         Ok(())
     }
 
+    async fn execute_namecheap(&self) -> Result<(), crate::error::DynamicError> {
+        for record in &self.records {
+            if let Record::AAAA = record {
+                let msg = "Namecheap DDNS does not support AAAA records";
+                self.logger.error(msg);
+                return Err(msg.into());
+            }
+        }
+
+        let ip = match self.checker.actual_ip() {
+            Some(ip) => ip,
+            None => return Err("Could not determine actual IP".into()),
+        };
+
+        let parts: Vec<&str> = self.domain.splitn(2, '.').collect();
+        let (host, domain) = if parts.len() >= 2 {
+            (parts[0].to_string(), parts[1].to_string())
+        } else {
+            ("@".to_string(), self.domain.clone())
+        };
+
+        let password = &self.credentials.password;
+        let url = format!(
+            "https://dynamicdns.park-your-domain.com/update?host={}&domain={}&password={}&ip={}",
+            host, domain, password, ip
+        );
+
+        let client = reqwest::Client::new();
+        let resp = client.get(&url).send().await?.text().await?;
+
+        if resp.contains("<ErrCount>0</ErrCount>") {
+            self.logger.info(&format!(
+                "{} A Namecheap updated to {}",
+                self.domain, ip
+            ));
+        } else {
+            let err_text = extract_xml_tag(&resp, "Err1")
+                .unwrap_or_else(|| resp.clone());
+            self.logger.error(&format!(
+                "{} A Namecheap update failed: {}",
+                self.domain, err_text
+            ));
+            return Err(format!("Namecheap update failed: {}", err_text).into());
+        }
+
+        Ok(())
+    }
+
     async fn call_all_methods(&self, client: reqwest::Client, url: String, record: &Record) -> Result<(), reqwest::Error> {
         for method in &self.methods {
             match method {
@@ -377,6 +432,14 @@ fn apex_domain_from(domain: &str) -> String {
     } else {
         domain.to_string()
     }
+}
+
+fn extract_xml_tag(xml: &str, tag: &str) -> Option<String> {
+    let open = format!("<{}>", tag);
+    let close = format!("</{}>", tag);
+    let start = xml.find(&open)? + open.len();
+    let end = xml[start..].find(&close)?;
+    Some(xml[start..start + end].to_string())
 }
 
 fn resolve_secret(value: &str) -> Result<String, crate::error::DynamicError> {
@@ -457,6 +520,19 @@ async fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
                 Err(e) => { logger.error(&format!("{}", e)); process::exit(1); }
             };
             (Credentials::new(String::new(), String::new()), Some(token))
+        } else if server == "namecheap" {
+            let raw_password = match doc["password"].as_str() {
+                Some(result) => result,
+                None => {
+                    logger.error(&format!("'password' is required for Namecheap in {}", file));
+                    process::exit(1);
+                }
+            };
+            let password = match resolve_secret(raw_password) {
+                Ok(v) => v,
+                Err(e) => { logger.error(&format!("{}", e)); process::exit(1); }
+            };
+            (Credentials::new(String::new(), password), None)
         } else {
             let username = match doc["username"].as_str() {
                 Some(result) => result,
@@ -483,8 +559,8 @@ async fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
             (Credentials::new(username, password), None)
         };
 
-        let methods: Vec<&str> = if server == "cloudflare" {
-            // Cloudflare doesn't use methods, use a placeholder
+        let methods: Vec<&str> = if server == "cloudflare" || server == "namecheap" {
+            // Cloudflare and Namecheap don't use methods, use a placeholder
             vec!["put"]
         } else {
             match doc["methods"].as_vec() {
