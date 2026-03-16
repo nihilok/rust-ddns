@@ -100,14 +100,14 @@ impl FromStr for Record {
 
 #[derive(Debug, PartialEq)]
 enum Protocol {
-    GoogleDomains,
+    Cloudflare,
     MailInABox,
 }
 
 impl Protocol {
     fn build_url(&self, server: &str, domain: &str, record: &str) -> String {
         match self {
-            Protocol::GoogleDomains => format!("https://{server}/nic/update?hostname={domain}"),
+            Protocol::Cloudflare => String::new(),
             Protocol::MailInABox => {
                 format!("https://{server}/admin/dns/custom/{domain}/{record}")
             }
@@ -116,7 +116,11 @@ impl Protocol {
 
     fn from_server(server: &str) -> Self {
         match server {
-            "domains.google.com" => Self::GoogleDomains,
+            "domains.google.com" => {
+                eprintln!("ERROR: Google Domains DDNS (domains.google.com) is no longer supported. Google sold Domains to Squarespace, which dropped DDNS support. Please migrate to Cloudflare: update your config to use 'server: cloudflare' with an 'api_token'. See README for migration steps.");
+                std::process::exit(1);
+            }
+            "cloudflare" => Self::Cloudflare,
             _ => Self::MailInABox,
         }
     }
@@ -130,6 +134,7 @@ pub struct APIClient {
     credentials: Credentials,
     server: String,
     protocol: Protocol,
+    api_token: Option<String>,
     checker: Rc<ip_checker::IP>,
     logger: Logger,
 }
@@ -141,6 +146,7 @@ impl APIClient {
         methods: Vec<&str>,
         records: Vec<&str>,
         credentials: Credentials,
+        api_token: Option<String>,
         checker: Rc<ip_checker::IP>,
         ) -> APIClient {
         let logger = Logger::new();
@@ -182,12 +188,17 @@ impl APIClient {
             records,
             credentials,
             protocol,
+            api_token,
             checker,
             logger,
         };
     }
 
     pub async fn execute(&self) -> Result<(), crate::error::DynamicError> {
+        if self.protocol == Protocol::Cloudflare {
+            return self.execute_cloudflare().await;
+        }
+
         let changed = &self.checker.compare(&self.domain).await?;
         if !changed {
             return Ok(());
@@ -218,6 +229,103 @@ impl APIClient {
             calls.push(self.call_all_methods(client, request_url, record))
         }
         future::join_all(calls).await;
+        Ok(())
+    }
+
+    async fn execute_cloudflare(&self) -> Result<(), crate::error::DynamicError> {
+        let token = match &self.api_token {
+            Some(t) => t.clone(),
+            None => {
+                return Err("Cloudflare api_token is required".into());
+            }
+        };
+
+        let ip = match self.checker.actual_ip() {
+            Some(ip) => ip,
+            None => {
+                return Err("Could not determine actual IP".into());
+            }
+        };
+
+        let apex_domain = apex_domain_from(&self.domain);
+
+        let client = reqwest::Client::new();
+
+        for record in &self.records {
+            let record_type = record.to_string();
+
+            // Resolve zone ID
+            let zone_url = format!(
+                "https://api.cloudflare.com/client/v4/zones?name={}",
+                apex_domain
+            );
+            let zone_resp = client
+                .get(&zone_url)
+                .header("Authorization", format!("Bearer {}", token))
+                .send()
+                .await?
+                .json::<serde_json::Value>()
+                .await?;
+
+            let zone_id = zone_resp["result"][0]["id"]
+                .as_str()
+                .ok_or_else(|| format!("Could not find Cloudflare zone for domain '{}'", apex_domain))?
+                .to_string();
+
+            // Resolve record ID
+            let records_url = format!(
+                "https://api.cloudflare.com/client/v4/zones/{}/dns_records?name={}&type={}",
+                zone_id, self.domain, record_type
+            );
+            let records_resp = client
+                .get(&records_url)
+                .header("Authorization", format!("Bearer {}", token))
+                .send()
+                .await?
+                .json::<serde_json::Value>()
+                .await?;
+
+            let record_id = records_resp["result"][0]["id"]
+                .as_str()
+                .ok_or_else(|| format!("Could not find Cloudflare DNS record for '{}' type {}", self.domain, record_type))?
+                .to_string();
+
+            // Update record
+            let update_url = format!(
+                "https://api.cloudflare.com/client/v4/zones/{}/dns_records/{}",
+                zone_id, record_id
+            );
+            let body = serde_json::json!({
+                "type": record_type,
+                "name": self.domain,
+                "content": ip.to_string(),
+                "ttl": 1
+            });
+
+            let update_resp = client
+                .put(&update_url)
+                .header("Authorization", format!("Bearer {}", token))
+                .json(&body)
+                .send()
+                .await?
+                .json::<serde_json::Value>()
+                .await?;
+
+            if update_resp["success"].as_bool().unwrap_or(false) {
+                self.logger.info(&format!(
+                    "{} {} Cloudflare updated to {}",
+                    self.domain, record_type, ip
+                ));
+            } else {
+                let errors = update_resp["errors"].to_string();
+                self.logger.error(&format!(
+                    "{} {} Cloudflare update failed: {}",
+                    self.domain, record_type, errors
+                ));
+                return Err(format!("Cloudflare update failed: {}", errors).into());
+            }
+        }
+
         Ok(())
     }
 
@@ -259,6 +367,15 @@ impl APIClient {
         let yaml = load_yaml_from_file(&filename);
         let yaml = yaml.clone();
         parse_yaml(yaml, filename).await
+    }
+}
+
+fn apex_domain_from(domain: &str) -> String {
+    let parts: Vec<&str> = domain.split('.').collect();
+    if parts.len() >= 3 {
+        parts[parts.len() - 2..].join(".")
+    } else {
+        domain.to_string()
     }
 }
 
@@ -309,24 +426,9 @@ async fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
     let logger = Logger::new();
     let mut config = Vec::new();
     for doc in docs.iter() {
-        let username;
-        let password;
         let server;
         let domain;
-        match doc["username"].as_str() {
-            Some(result) => username = result,
-            None => {
-                logger.error(&format!("'username' should be in {}", file));
-                process::exit(1);
-            }
-        };
-        match doc["password"].as_str() {
-            Some(result) => password = result,
-            None => {
-                logger.error(&format!("'password' should be in {}", file));
-                process::exit(1);
-            }
-        };
+
         match doc["server"].as_str() {
             Some(result) => server = result,
             None => {
@@ -342,37 +444,68 @@ async fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
             }
         };
 
-        let username = match resolve_secret(username) {
-            Ok(v) => v,
-            Err(e) => { logger.error(&format!("{}", e)); process::exit(1); }
+        let (credentials, api_token) = if server == "cloudflare" {
+            let raw_token = match doc["api_token"].as_str() {
+                Some(t) => t,
+                None => {
+                    logger.error(&format!("'api_token' is required for Cloudflare in {}", file));
+                    process::exit(1);
+                }
+            };
+            let token = match resolve_secret(raw_token) {
+                Ok(v) => v,
+                Err(e) => { logger.error(&format!("{}", e)); process::exit(1); }
+            };
+            (Credentials::new(String::new(), String::new()), Some(token))
+        } else {
+            let username = match doc["username"].as_str() {
+                Some(result) => result,
+                None => {
+                    logger.error(&format!("'username' should be in {}", file));
+                    process::exit(1);
+                }
+            };
+            let password = match doc["password"].as_str() {
+                Some(result) => result,
+                None => {
+                    logger.error(&format!("'password' should be in {}", file));
+                    process::exit(1);
+                }
+            };
+            let username = match resolve_secret(username) {
+                Ok(v) => v,
+                Err(e) => { logger.error(&format!("{}", e)); process::exit(1); }
+            };
+            let password = match resolve_secret(password) {
+                Ok(v) => v,
+                Err(e) => { logger.error(&format!("{}", e)); process::exit(1); }
+            };
+            (Credentials::new(username, password), None)
         };
-        let password = match resolve_secret(password) {
-            Ok(v) => v,
-            Err(e) => { logger.error(&format!("{}", e)); process::exit(1); }
-        };
-        let credentials = Credentials::new(username, password);
 
-        let methods: Vec<&str>;
-
-        match doc["methods"].as_vec() {
-            Some(methods_vec) => {
-                methods = methods_vec
+        let methods: Vec<&str> = if server == "cloudflare" {
+            // Cloudflare doesn't use methods, use a placeholder
+            vec!["put"]
+        } else {
+            match doc["methods"].as_vec() {
+                Some(methods_vec) => {
+                    methods_vec
                         .iter()
                         .map(|m| match m.as_str() {
                             Some(method) => method,
                             None => {
-                                logger
-                                    .error(&format!("could not parse 'methods' list in {}", file));
+                                logger.error(&format!("could not parse 'methods' list in {}", file));
                                 process::exit(1);
                             }
                         })
                         .collect()
+                }
+                None => {
+                    logger.error(&format!("'methods' (list) should be in {}", file));
+                    process::exit(1);
+                }
             }
-            None => {
-                logger.error(&format!("'methods' (list) should be in {}", file));
-                process::exit(1);
-            }
-        }
+        };
 
         let records = doc["records"].as_vec();
         let records = match records {
@@ -389,7 +522,7 @@ async fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
             None => vec!["a"],
         };
         let checker_clone = Rc::clone(&checker);
-        let api = APIClient::new(server, domain, methods, records, credentials, checker_clone);
+        let api = APIClient::new(server, domain, methods, records, credentials, api_token, checker_clone);
         config.push(api)
     }
     config

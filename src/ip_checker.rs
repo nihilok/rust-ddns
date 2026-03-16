@@ -138,6 +138,10 @@ impl IP {
         Ok(false)
     }
 
+    pub fn actual_ip(&self) -> Option<std::net::Ipv4Addr> {
+        self.actual
+    }
+
     /// Constructs a new instance of the `IP` structure with `actual`
     pub fn new() -> IP {
         IP { actual: None }

@@ -88,6 +88,28 @@ domain: my.other.domain.com
 
 The above example config would make 6 calls to the same server, one for each method for each record type. You can provide between 1 and 3 methods, either PUT, POST, or DELETE.
 
+### Cloudflare
+
+Google Domains DDNS (`domains.google.com`) is no longer supported — Google sold Domains to Squarespace, which dropped DDNS support. Migrate to Cloudflare:
+
+```yaml
+server: cloudflare
+domain: ddns.example.com
+api_token: env:CF_API_TOKEN
+records:
+    - A
+```
+
+- `server: cloudflare` enables the Cloudflare protocol
+- `api_token` is required (plain text or `env:` reference); `username` and `password` are not used
+- Zone ID and record ID are resolved automatically from the domain name
+- `methods` is not required for Cloudflare configs
+
+Migration steps:
+1. Transfer your domain to Cloudflare (or add it as a DNS zone)
+2. Create a Cloudflare API token with `Zone:DNS:Edit` permission
+3. Update your config to use `server: cloudflare` and `api_token`
+
 ### Secure Credential Storage
 
 Passwords (and usernames) can be read from environment variables at runtime using the `env:` prefix:

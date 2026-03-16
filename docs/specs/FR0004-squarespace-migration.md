@@ -1,7 +1,7 @@
 # FR0004 — Squarespace Migration (Google Domains Sunset)
 
 ## Status
-Draft
+Implemented
 
 ## Summary
 Google Domains was sold to Squarespace in 2023. Squarespace does not support the DynDNS `/nic/update` protocol that the `GoogleDomains` protocol variant currently targets, so that variant is broken for all migrated users. This FR removes the dead protocol and adds Cloudflare as a replacement, as it is the most common migration target.
