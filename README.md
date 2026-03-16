@@ -53,3 +53,29 @@ domain: my.other.domain.com
 ```
 
 The above example config would make 6 calls to the same server, one for each method for each record type. You can provide between 1 and 3 methods, either PUT, POST, or DELETE.
+
+### Secure Credential Storage
+
+Passwords (and usernames) can be read from environment variables at runtime using the `env:` prefix:
+
+```yaml
+password: env:MY_SECRET_VAR
+```
+
+- `password: env:MY_VAR` resolves the value from environment variable `MY_VAR` at runtime
+- If the variable is unset or empty, the app exits with an error
+- Plain text passwords still work unchanged
+- Recommended: use a systemd `EnvironmentFile` to supply secrets without writing them to disk
+
+Example systemd service drop-in (`/etc/systemd/system/rust-ddns.service.d/secrets.conf`):
+
+```ini
+[Service]
+EnvironmentFile=/etc/rust-ddns/secrets
+```
+
+Where `/etc/rust-ddns/secrets` contains:
+
+```
+MY_SECRET_VAR=your-api-key-here
+```

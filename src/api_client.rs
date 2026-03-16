@@ -262,6 +262,17 @@ impl APIClient {
     }
 }
 
+fn resolve_secret(value: &str) -> Result<String, crate::error::DynamicError> {
+    if let Some(var_name) = value.strip_prefix("env:") {
+        match std::env::var(var_name) {
+            Ok(v) if !v.is_empty() => Ok(v),
+            _ => Err(format!("password env var '{}' is not set", var_name).into()),
+        }
+    } else {
+        Ok(value.to_string())
+    }
+}
+
 fn load_yaml_from_file(file: &str) -> Vec<Yaml> {
     let logger = crate::logging::Logger::new();
     let mut handle = match File::open(file) {
@@ -331,7 +342,15 @@ async fn parse_yaml(docs: Vec<Yaml>, file: String) -> Vec<APIClient> {
             }
         };
 
-        let credentials = Credentials::new(username.to_string(), password.to_string());
+        let username = match resolve_secret(username) {
+            Ok(v) => v,
+            Err(e) => { logger.error(&format!("{}", e)); process::exit(1); }
+        };
+        let password = match resolve_secret(password) {
+            Ok(v) => v,
+            Err(e) => { logger.error(&format!("{}", e)); process::exit(1); }
+        };
+        let credentials = Credentials::new(username, password);
 
         let methods: Vec<&str>;
 

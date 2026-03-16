@@ -1,7 +1,7 @@
 # FR0001 — Secure Credential Storage
 
 ## Status
-Accepted
+Implemented
 
 ## Summary
 Passwords (API secrets) must not be stored in plain text in the config file (`~/.ddns.conf`).
