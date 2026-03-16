@@ -1,12 +1,13 @@
 use std::future::Future;
 use futures::future;
 use api_client::APIClient;
-use arg_parser::Args;
+use arg_parser::{Args, Commands};
 use clap::Parser;
 
 mod api_client;
 mod arg_parser;
 mod error;
+mod installer;
 mod ip_checker;
 mod logging;
 mod time_tools;
@@ -30,6 +31,18 @@ async fn log_and_ignore_errors<F>(fut: F)
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), error::DynamicError> {
     let args = Args::parse();
+
+    if let Some(cmd) = args.command {
+        match cmd {
+            Commands::Install { interval, log_file, config_file } => {
+                installer::install(&interval, log_file.as_deref(), config_file.as_deref());
+            }
+            Commands::Uninstall { purge } => {
+                installer::uninstall(purge);
+            }
+        }
+        return Ok(());
+    }
 
     if args.ip {
         println!("{}", ip_checker::IP::get_actual_ip().await?);

@@ -7,12 +7,15 @@
 
 ### Installation
 
+Installation is built into the binary via `rust-ddns install` and `rust-ddns uninstall` subcommands. First build the binary with `cargo build --release`, then run it once to install:
+
 #### Linux (systemd)
 
 ```sh
-./install.sh
+cargo build --release
+./target/release/rust-ddns install
 # or with a custom interval:
-RUST_DDNS_INTERVAL=30min ./install.sh
+./target/release/rust-ddns install --interval 30min
 ```
 
 Then activate the timer:
@@ -24,22 +27,26 @@ sudo systemctl enable --now rust-ddns.timer
 #### macOS (launchd)
 
 ```sh
-./install.sh
-# or with a custom interval:
-RUST_DDNS_INTERVAL=30min ./install.sh
+cargo build --release
+./target/release/rust-ddns install --interval 30min
 ```
 
-The script installs a LaunchAgent at `~/Library/LaunchAgents/com.rust-ddns.plist` and loads it automatically.
+The LaunchAgent is installed at `~/Library/LaunchAgents/com.rust-ddns.plist` and loaded automatically.
 
 #### Windows (Task Scheduler)
 
 ```powershell
-.\install.ps1
-# or with a custom interval (in seconds or e.g. 5min/1h):
-$env:RUST_DDNS_INTERVAL="30min"; .\install.ps1
+cargo build --release
+.\target\release\rust-ddns.exe install --interval 30min
 ```
 
-To uninstall on any platform, run `./uninstall.sh` (Linux/macOS) or `.\uninstall.ps1` (Windows).
+#### Uninstall
+
+```sh
+rust-ddns uninstall
+# Remove config and log files as well:
+rust-ddns uninstall --purge
+```
 
 The default interval is `5min` on all platforms.
 

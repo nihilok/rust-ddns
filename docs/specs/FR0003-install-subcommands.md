@@ -1,7 +1,7 @@
 # FR0003 — Install/Uninstall Subcommands
 
 ## Status
-Draft
+Implemented
 
 ## Dependencies
 - FR0002 — Cross-Platform Installation (defines the per-platform install behaviour this FR bakes in)
