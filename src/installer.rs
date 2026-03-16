@@ -42,15 +42,26 @@ pub fn install(interval: &str, log_file: Option<&str>, config_file: Option<&str>
         process::exit(1);
     });
 
+    let log_path = log_file
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("{}/.rust-ddns.log", home));
+
+    let config_arg = if let Some(cf) = config_file {
+        format!(" --config-file {}", cf)
+    } else {
+        String::new()
+    };
+
     let wrapper_path = format!("{}/ddnsd-rust-ddns", bin_dir);
-    let wrapper_content = "#!/bin/bash\n\
-if [[ -z $RUST_DDNS_LOG_FILE ]]; then\n\
-RUST_DDNS_LOG_FILE=$HOME/.rust-ddns.log\n\
-fi\n\
-touch $RUST_DDNS_LOG_FILE\n\
+    let wrapper_content = format!("#!/bin/bash\n\
+RUST_DDNS_LOG_FILE={log}\n\
+touch \"$RUST_DDNS_LOG_FILE\"\n\
 cd $HOME || exit 1\n\
-rust-ddns &>> $RUST_DDNS_LOG_FILE\n\
-echo \"$(tail -n 200 $RUST_DDNS_LOG_FILE)\" > $RUST_DDNS_LOG_FILE\n";
+rust-ddns{config} &>> \"$RUST_DDNS_LOG_FILE\"\n\
+echo \"$(tail -n 200 \"$RUST_DDNS_LOG_FILE\")\" > \"$RUST_DDNS_LOG_FILE\"\n",
+        log = log_path,
+        config = config_arg,
+    );
 
     fs::write(&wrapper_path, wrapper_content).unwrap_or_else(|e| {
         eprintln!("ERROR: Could not write wrapper script: {}", e);
@@ -60,18 +71,6 @@ echo \"$(tail -n 200 $RUST_DDNS_LOG_FILE)\" > $RUST_DDNS_LOG_FILE\n";
         eprintln!("ERROR: Could not set wrapper permissions: {}", e);
         process::exit(1);
     });
-
-    let log_path = log_file
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| format!("{}/.rust-ddns.log", home));
-    let _ = log_path;
-
-    let config_note = if let Some(cf) = config_file {
-        format!(" --config-file {}", cf)
-    } else {
-        String::new()
-    };
-    let _ = config_note;
 
     let timer_content = format!("[Unit]\n\
 Description=Runs rust-ddns every {interval}\n\
@@ -154,7 +153,7 @@ pub fn uninstall(purge: bool) {
 }
 
 #[cfg(target_os = "macos")]
-pub fn install(interval: &str, log_file: Option<&str>, _config_file: Option<&str>) {
+pub fn install(interval: &str, log_file: Option<&str>, config_file: Option<&str>) {
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
 
@@ -184,15 +183,27 @@ pub fn install(interval: &str, log_file: Option<&str>, _config_file: Option<&str
         process::exit(1);
     });
 
+    let interval_secs = parse_interval_secs(interval);
+    let log_path = log_file
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("{}/.rust-ddns.log", home));
+
+    let config_arg = if let Some(cf) = config_file {
+        format!(" --config-file {}", cf)
+    } else {
+        String::new()
+    };
+
     let wrapper_path = format!("{}/ddnsd-rust-ddns", bin_dir);
-    let wrapper_content = "#!/bin/bash\n\
-if [[ -z $RUST_DDNS_LOG_FILE ]]; then\n\
-RUST_DDNS_LOG_FILE=$HOME/.rust-ddns.log\n\
-fi\n\
-touch $RUST_DDNS_LOG_FILE\n\
+    let wrapper_content = format!("#!/bin/bash\n\
+RUST_DDNS_LOG_FILE={log}\n\
+touch \"$RUST_DDNS_LOG_FILE\"\n\
 cd $HOME || exit 1\n\
-rust-ddns &>> $RUST_DDNS_LOG_FILE\n\
-echo \"$(tail -n 200 $RUST_DDNS_LOG_FILE)\" > $RUST_DDNS_LOG_FILE\n";
+rust-ddns{config} &>> \"$RUST_DDNS_LOG_FILE\"\n\
+echo \"$(tail -n 200 \"$RUST_DDNS_LOG_FILE\")\" > \"$RUST_DDNS_LOG_FILE\"\n",
+        log = log_path,
+        config = config_arg,
+    );
 
     fs::write(&wrapper_path, wrapper_content).unwrap_or_else(|e| {
         eprintln!("ERROR: Could not write wrapper script: {}", e);
@@ -202,11 +213,6 @@ echo \"$(tail -n 200 $RUST_DDNS_LOG_FILE)\" > $RUST_DDNS_LOG_FILE\n";
         eprintln!("ERROR: Could not set wrapper permissions: {}", e);
         process::exit(1);
     });
-
-    let interval_secs = parse_interval_secs(interval);
-    let log_path = log_file
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| format!("{}/.rust-ddns.log", home));
 
     let plist_dir = format!("{}/Library/LaunchAgents", home);
     fs::create_dir_all(&plist_dir).unwrap_or_else(|e| {
@@ -290,7 +296,7 @@ pub fn uninstall(purge: bool) {
 }
 
 #[cfg(target_os = "windows")]
-pub fn install(interval: &str, log_file: Option<&str>, _config_file: Option<&str>) {
+pub fn install(interval: &str, log_file: Option<&str>, config_file: Option<&str>) {
     use std::fs;
 
     let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| {
@@ -320,15 +326,22 @@ pub fn install(interval: &str, log_file: Option<&str>, _config_file: Option<&str
         .map(|s| s.to_string())
         .unwrap_or_else(|| format!("{}\\.rust-ddns.log", user_profile));
 
+    let config_arg = if let Some(cf) = config_file {
+        format!(" --config-file {}", cf)
+    } else {
+        String::new()
+    };
+
     let wrapper_dest = format!("{}\\ddnsd.cmd", install_dir);
     let wrapper_content = format!(
         "@echo off\r\n\
 set LOG_FILE={log}\r\n\
 if not exist \"%LOG_FILE%\" type nul > \"%LOG_FILE%\"\r\n\
-\"{binary}\" >> \"%LOG_FILE%\" 2>&1\r\n\
+\"{binary}\"{config} >> \"%LOG_FILE%\" 2>&1\r\n\
 powershell -Command \"Get-Content '%LOG_FILE%' -Tail 200 | Set-Content '%LOG_FILE%'\"\r\n",
         log = log_path,
         binary = binary_dest,
+        config = config_arg,
     );
     fs::write(&wrapper_dest, &wrapper_content).unwrap_or_else(|e| {
         eprintln!("ERROR: Could not write wrapper: {}", e);

@@ -198,17 +198,17 @@ impl APIClient {
     }
 
     pub async fn execute(&self) -> Result<(), crate::error::DynamicError> {
+        let changed = self.checker.compare(&self.domain).await?;
+        if !changed {
+            return Ok(());
+        }
+
         if self.protocol == Protocol::Cloudflare {
             return self.execute_cloudflare().await;
         }
 
         if self.protocol == Protocol::Namecheap {
             return self.execute_namecheap().await;
-        }
-
-        let changed = &self.checker.compare(&self.domain).await?;
-        if !changed {
-            return Ok(());
         }
         let mut calls = Vec::new();
         for record in &mut self.records.iter() {
@@ -358,13 +358,19 @@ impl APIClient {
         };
 
         let password = &self.credentials.password;
-        let url = format!(
-            "https://dynamicdns.park-your-domain.com/update?host={}&domain={}&password={}&ip={}",
-            host, domain, password, ip
-        );
-
         let client = reqwest::Client::new();
-        let resp = client.get(&url).send().await?.text().await?;
+        let resp = client
+            .get("https://dynamicdns.park-your-domain.com/update")
+            .query(&[
+                ("host", host.as_str()),
+                ("domain", domain.as_str()),
+                ("password", password.as_str()),
+                ("ip", &ip.to_string()),
+            ])
+            .send()
+            .await?
+            .text()
+            .await?;
 
         if resp.contains("<ErrCount>0</ErrCount>") {
             self.logger.info(&format!(
