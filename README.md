@@ -7,14 +7,41 @@
 
 ### Installation
 
-`./install.sh` or `RUST_DDNS_INTERVAL=30min ./install.sh`
-
-(default interval is `5min`)
+#### Linux (systemd)
 
 ```sh
-sudo systemctl enable rust-ddns.timer
-sudo systemctl start rust-ddns.timer
+./install.sh
+# or with a custom interval:
+RUST_DDNS_INTERVAL=30min ./install.sh
 ```
+
+Then activate the timer:
+
+```sh
+sudo systemctl enable --now rust-ddns.timer
+```
+
+#### macOS (launchd)
+
+```sh
+./install.sh
+# or with a custom interval:
+RUST_DDNS_INTERVAL=30min ./install.sh
+```
+
+The script installs a LaunchAgent at `~/Library/LaunchAgents/com.rust-ddns.plist` and loads it automatically.
+
+#### Windows (Task Scheduler)
+
+```powershell
+.\install.ps1
+# or with a custom interval (in seconds or e.g. 5min/1h):
+$env:RUST_DDNS_INTERVAL="30min"; .\install.ps1
+```
+
+To uninstall on any platform, run `./uninstall.sh` (Linux/macOS) or `.\uninstall.ps1` (Windows).
+
+The default interval is `5min` on all platforms.
 
 ## Debugging
 

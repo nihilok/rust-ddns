@@ -1,7 +1,7 @@
 # FR0002 — Cross-Platform Installation
 
 ## Status
-Draft
+Implemented
 
 ## Summary
 The install and uninstall scripts are Linux/systemd-only. The application should be installable and run as a scheduled task on macOS and Windows as well.
